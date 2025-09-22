@@ -3,71 +3,97 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mapa povrchů pro longboard</title>
+  <title>Mapa povrchů – viewer</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    html, body { height:100%; margin:0; }
-    #map { height:100%; width:100%; }
+    html, body { height:100%; margin:0 }
+    #map { height:100% }
+    #banner {
+      position:fixed; top:10px; left:50%; transform:translateX(-50%);
+      background:#111827; color:#e5e7eb; padding:8px 12px; border-radius:10px;
+      box-shadow:0 6px 20px rgba(0,0,0,.35); font-family:system-ui, sans-serif; font-size:14px; z-index:1000
+    }
+    #banner.error { background:#7f1d1d }
+    #banner small { color:#9ca3af }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="banner">Načítám poznámky… <small>(když to padne, zkontroluj API key / sdílení / odkaz)</small></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Raw link na tvůj soubor GeoJSON na Google Drive
-    const FILE_ID = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb";
-    const DATA_URL = `https://drive.google.com/uc?export=download&id=${FILE_ID}`;
+    // === NASTAVENÍ ===
+    // 1) Google Drive API varianta (doporučené pro Drive)
+    const DRIVE_FILE_ID = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb"; // tvoje ID
+    const GOOGLE_API_KEY = "PASTE_YOUR_API_KEY_HERE";          // vlož svůj API key
+    const DRIVE_DATA_URL = `https://www.googleapis.com/drive/v3/files/${DRIVE_FILE_ID}?alt=media&key=${GOOGLE_API_KEY}`;
 
+    // 2) Fallback na soubor v repu (nahraj do stejného repa data.geojson)
+    const LOCAL_DATA_URL = "./data.geojson";
+
+    // 3) Volitelně můžeš přepsat zdroj parametrem ?data=ENCODED_URL
+    const urlParams = new URLSearchParams(location.search);
+    const override = urlParams.get("data");
+    const DATA_URL = override ? decodeURIComponent(override)
+                    : (GOOGLE_API_KEY && GOOGLE_API_KEY !== "PASTE_YOUR_API_KEY_HERE" ? DRIVE_DATA_URL : LOCAL_DATA_URL);
+
+    // === MAPA ===
     const map = L.map("map").setView([50.0755,14.4378], 13);
-
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
+      maxZoom: 20,
       attribution: "&copy; OpenStreetMap přispěvatelé"
     }).addTo(map);
 
-    function styleFor(feature){
-      const p = feature.properties || {};
-      if(feature.geometry && feature.geometry.type === "Point"){
-        return { color: p.color || "#38bdf8", weight: 2 };
-      }
+    function styleFor(f){
+      const p = f.properties || {};
+      if (f.geometry && f.geometry.type === "Point") return { color: p.color || "#38bdf8", weight: 2 };
       let color = "#84cc16";
-      if(p.surface === "asfalt" && p.condition === "hladký") color = "#22c55e";
-      else if(p.surface === "dlažba") color = "#f59e0b";
-      if(p.condition === "výtluky" || p.condition === "nebezpečné") color = "#ef4444";
-      if(p.surface === "štěrk") color = "#a3a3a3";
-      return { color, weight: p.width || 5, opacity: 0.95 };
+      if (p.surface === "asfalt" && p.condition === "hladký") color = "#22c55e";
+      else if (p.surface === "dlažba") color = "#f59e0b";
+      if (p.condition === "výtluky" || p.condition === "nebezpečné") color = "#ef4444";
+      if (p.surface === "štěrk") color = "#a3a3a3";
+      return { color, weight: p.width || 5, opacity: .95 };
     }
 
-    function loadGeoJSON(url){
-      fetch(url)
-        .then(resp => {
-          if(!resp.ok) throw new Error("HTTP error " + resp.status);
-          return resp.json();
-        })
-        .then(fc => {
-          L.geoJSON(fc, {
-            style: styleFor,
-            pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
-              radius: 6,
-              color: styleFor(feature).color,
-              weight: 2
-            }),
-            onEachFeature: (feature, layer) => {
-              const p = feature.properties || {};
-              const popup = `
-                <b>${p.surface || ""}</b><br>
-                ${p.condition || ""}<br>
-                ${p.note || ""}
-              `;
-              layer.bindPopup(popup);
-            }
-          }).addTo(map);
-        })
-        .catch(err => {
-          console.error("Chyba při načítání GeoJSON:", err);
-          alert("Nepodařilo se načíst data GeoJSON. Zkontroluj, jestli je soubor veřejně sdílený a link správný.");
-        });
+    function showBanner(msg, isError=false){
+      const b = document.getElementById("banner");
+      b.textContent = msg;
+      b.className = isError ? "error" : "";
+      if (!isError) setTimeout(()=> b.remove(), 1800);
+    }
+
+    async function loadGeoJSON(url){
+      try{
+        const bust = (url.includes("?") ? "&" : "?") + "t=" + Date.now();
+        const res = await fetch(url + bust, { mode:"cors" });
+        if(!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
+        const data = await res.json();
+
+        const layer = L.geoJSON(data, {
+          style: styleFor,
+          pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 6, color: styleFor(f).color, weight: 2 }),
+          onEachFeature: (feature, layer) => {
+            const p = feature.properties || {};
+            const lines = [];
+            if (p.surface) lines.push(`<b>${p.surface}</b>`);
+            if (p.condition) lines.push(p.condition);
+            if (p.tag) lines.push(`<i>${p.tag}</i>`);
+            if (p.note) lines.push(p.note.replace(/</g,"&lt;"));
+            if (lines.length) layer.bindPopup(lines.join("<br>"));
+          }
+        }).addTo(map);
+
+        try{
+          const bb = layer.getBounds();
+          if (bb.isValid()) map.fitBounds(bb.pad(0.1));
+        }catch{}
+
+        showBanner("Načteno ✔");
+      }catch(err){
+        console.error("Chyba při načítání GeoJSON:", err);
+        showBanner("Nepodařilo se načíst data (API key / sdílení / formát).", true);
+      }
     }
 
     loadGeoJSON(DATA_URL);
