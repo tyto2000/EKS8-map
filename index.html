@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mapa povrchů – viewer (barvy + ikony)</title>
+  <title>Mapa povrchů – viewer (barvy + ikony) + createdAt</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     html, body { height:100%; margin:0 }
@@ -49,6 +49,8 @@
     /* Rezerva dole, ať není popup pod lištou nepraktický */
     .leaflet-bottom { bottom: 56px; }
     @media (max-width: 520px){ #legend { padding: 6px 8px } .leaflet-bottom { bottom: 50px } }
+
+    .muted { color:#6b7280; font-size:12px }
   </style>
 </head>
 <body>
@@ -152,6 +154,21 @@
         const color = p.color || colorForQuality(p.quality);
         return { color, weight: Number(p.width ?? 6), opacity: 0.95 };
       }
+    }
+
+    // === Datum/čas – z ISO -> lokální input-like string (CZ) ===
+    function fmtCreated(iso){
+      if(!iso) return "";
+      try{
+        const d = new Date(iso);
+        const pad = (n)=> String(n).padStart(2,'0');
+        const day = pad(d.getDate());
+        const mon = pad(d.getMonth()+1);
+        const yr  = d.getFullYear();
+        const hh  = pad(d.getHours());
+        const mm  = pad(d.getMinutes());
+        return `${day}.${mon}.${yr} ${hh}:${mm}`;
+      }catch{ return ""; }
     }
 
     function showBanner(msg, isError=false){
@@ -281,16 +298,23 @@
           onEachFeature: (feature, layer) => {
             const p = feature.properties || {};
             const lines = [];
+
+            // Vložíme "Přidáno" z createdAt (ISO) – formát CZ
+            const createdISO = p.createdAt || p.created || p.timestamp;
+            const createdStr = fmtCreated(createdISO);
+            if (createdStr) lines.push(`<span class="muted">Přidáno: ${createdStr}</span>`);
+
             if (feature.geometry.type === "Point") {
-              // do popupu krátce napiš typ bodu
-              const lbl = POINT_LABELS[p.pointIcon] || "bod";
-              lines.push(`<b>${lbl}</b>`);
+              const lbl = (p.pointIcon && ({warning:"pozor",speed_bump:"retardér",zavora:"závora",railcross:"přejezd",pin:"bod"}[p.pointIcon])) || "bod";
+              lines.unshift(`<b>${lbl}</b>`);
             } else {
-              if (p.surface) lines.push(`<b>${p.surface}</b>`);
-              if (p.quality) lines.push(`<span style="color:${colorForQuality(p.quality)}">${p.quality}</span>`);
+              const left = [];
+              if (p.surface) left.push(`<b>${p.surface}</b>`);
+              if (p.quality) left.push(`<span style="color:${colorForQuality(p.quality)}">${p.quality}</span>`);
+              if (left.length) lines.unshift(left.join(" · "));
             }
             if (p.tag)  lines.push(`<i>${p.tag}</i>`);
-            if (p.note) lines.push(p.note.replace(/</g,"&lt;"));
+            if (p.note) lines.push(String(p.note).replace(/</g,"&lt;"));
             if (lines.length) layer.bindPopup(lines.join("<br>"));
 
             if(layer instanceof L.Polyline && !(layer instanceof L.Polygon)){
