@@ -24,15 +24,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     // === NASTAVENÍ ===
-    // 1) Google Drive API varianta (doporučené pro Drive)
-    const DRIVE_FILE_ID = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb"; // tvoje ID
-    const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ";          // vlož svůj API key
+    const DRIVE_FILE_ID = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb";
+    const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ";
     const DRIVE_DATA_URL = `https://www.googleapis.com/drive/v3/files/${DRIVE_FILE_ID}?alt=media&key=${GOOGLE_API_KEY}`;
-
-    // 2) Fallback na soubor v repu (nahraj do stejného repa data.geojson)
     const LOCAL_DATA_URL = "./data.geojson";
-
-    // 3) Volitelně můžeš přepsat zdroj parametrem ?data=ENCODED_URL
     const urlParams = new URLSearchParams(location.search);
     const override = urlParams.get("data");
     const DATA_URL = override ? decodeURIComponent(override)
@@ -45,15 +40,29 @@
       attribution: "&copy; OpenStreetMap přispěvatelé"
     }).addTo(map);
 
+    // === STYL, který respektuje exportované barvy/šířky ===
     function styleFor(f){
       const p = f.properties || {};
-      if (f.geometry && f.geometry.type === "Point") return { color: p.color || "#38bdf8", weight: 2 };
-      let color = "#84cc16";
-      if (p.surface === "asfalt" && p.condition === "hladký") color = "#22c55e";
-      else if (p.surface === "dlažba") color = "#f59e0b";
-      if (p.condition === "výtluky" || p.condition === "nebezpečné") color = "#ef4444";
-      if (p.surface === "štěrk") color = "#a3a3a3";
-      return { color, weight: p.width || 5, opacity: .95 };
+      // Preferuj explicitní data z exportu
+      if (f.geometry && f.geometry.type === "Point") {
+        const color = p.color || p["marker-color"] || p.stroke || "#38bdf8";
+        return { color, fillColor: color, fillOpacity: 0.9, weight: 2 };
+      } else {
+        let color = p.color || p.stroke;
+        let width = Number(p.width ?? p["stroke-width"] ?? 5);
+
+        // Fallback na tvoje heuristiky, když barva není v datech
+        if (!color) {
+          color = "#84cc16";
+          if (p.surface === "asfalt" && p.condition === "hladký") color = "#22c55e";
+          else if (p.surface === "dlažba") color = "#f59e0b";
+          if (p.condition === "výtluky" || p.condition === "nebezpečné") color = "#ef4444";
+          if (p.surface === "štěrk") color = "#a3a3a3";
+        }
+
+        const opacity = (typeof p["stroke-opacity"] !== "undefined") ? p["stroke-opacity"] : 0.95;
+        return { color, weight: width, opacity };
+      }
     }
 
     function showBanner(msg, isError=false){
@@ -72,7 +81,10 @@
 
         const layer = L.geoJSON(data, {
           style: styleFor,
-          pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 6, color: styleFor(f).color, weight: 2 }),
+          pointToLayer: (f, latlng) => {
+            const s = styleFor(f);
+            return L.circleMarker(latlng, { radius: 6, color: s.color, fillColor: s.fillColor || s.color, fillOpacity: s.fillOpacity ?? 0.9, weight: s.weight ?? 2 });
+          },
           onEachFeature: (feature, layer) => {
             const p = feature.properties || {};
             const lines = [];
