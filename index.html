@@ -31,27 +31,20 @@
       gap: 10px;
       backdrop-filter: saturate(120%) blur(4px);
     }
-    #legend .title {
-      font-size: 13px; color: #111827; font-weight: 600; white-space: nowrap;
-    }
-    #legend .items {
-      display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin;
-      flex: 1;
-    }
+    #legend .title { font-size: 13px; color: #111827; font-weight: 600; white-space: nowrap; }
+    #legend .items { display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; flex: 1; }
     #legend .chip {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 999px;
       background: #fff; font-size: 12px; color: #111827; white-space: nowrap;
       box-shadow: 0 2px 6px rgba(0,0,0,.06);
     }
-    #legend .sw {
-      width: 14px; height: 14px; border-radius: 50%;
-      border: 1px solid rgba(0,0,0,.15);
-      flex: 0 0 auto;
-    }
+    #legend .sw { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); flex: 0 0 auto; }
     .iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
     .iconbox svg{display:block}
+
+    /* červené bodové piktogramy (stejné jako v editoru) */
+    .pticon{display:inline-flex;align-items:center;justify-content:center}
 
     /* Rezerva dole, ať není popup pod lištou nepraktický */
     .leaflet-bottom { bottom: 56px; }
@@ -71,21 +64,16 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     // === NASTAVENÍ ===
-    // 1) Google Drive API (změň si ID + KEY, nebo ponech prázdné a použij local)
     const DRIVE_FILE_ID  = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb"; // tvoje ID
     const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ";         // tvůj API key
     const DRIVE_DATA_URL = `https://www.googleapis.com/drive/v3/files/${DRIVE_FILE_ID}?alt=media&key=${GOOGLE_API_KEY}`;
-
-    // 2) Fallback na soubor v repu (nahraj do stejného repa data.geojson)
     const LOCAL_DATA_URL = "./data.geojson";
-
-    // 3) Volitelně můžeš přepsat zdroj parametrem ?data=ENCODED_URL
     const urlParams = new URLSearchParams(location.search);
     const override = urlParams.get("data");
     const DATA_URL = override ? decodeURIComponent(override)
                     : (GOOGLE_API_KEY && GOOGLE_API_KEY !== "PASTE_YOUR_API_KEY_HERE" ? DRIVE_DATA_URL : LOCAL_DATA_URL);
 
-    // === ICON LIB (musí sedět s editorem) ===
+    // === ICON LIB (musí sedět s editorem) — LINIE ===
     const ICON_SVGS = {
       dot:   '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
       square:'<svg width="16" height="16" viewBox="0 0 16 16"><rect x="4.2" y="4.2" width="7.6" height="7.6" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
@@ -106,6 +94,25 @@
       if(n.includes('hlín')) return 'triangle';
       return 'dot';
     };
+
+    // === BODY – stejné piktogramy jako v editoru (vždy červené) ===
+    const POINT_COLOR = "#ef4444";
+    const POINT_ICONS = {
+      warning:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 3L2.5 20h19L12 3z" fill="white" stroke="currentColor" stroke-width="2"/><path d="M12 8v6M12 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+      speed_bump:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M3 16h18" stroke="currentColor" stroke-width="2"/><path d="M4 16c4-6 12-6 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+      zavora:'<svg viewBox="0 0 24 24" width="100%" height="100%"><rect x="4" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="17" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="5" y="9" width="14" height="4" rx="1" fill="white" stroke="currentColor" stroke-width="2"/><path d="M6 9.5 L9 12.5 M9 9.5 L12 12.5 M12 9.5 L15 12.5 M15 9.5 L18 12.5" stroke="currentColor" stroke-width="2"/></svg>',
+      railcross:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 5 L19 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M5 5 L19 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+      pin:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 22s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z" fill="white" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></svg>'
+    };
+    const POINT_LABELS = { warning:"pozor", speed_bump:"retardér", zavora:"závora", railcross:"přejezd", pin:"bod" };
+
+    function pointDivIcon(props){
+      const size = Math.max(16, Math.min(48, Number(props.pointSize || 24)));
+      const key  = props.pointIcon || 'warning';
+      const svg  = POINT_ICONS[key] || POINT_ICONS.warning;
+      const html = `<div class="pticon" style="width:${size}px;height:${size}px;color:${POINT_COLOR}">${svg}</div>`;
+      return L.divIcon({ html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2] });
+    }
 
     // === Model z dat (meta) nebo fallback ===
     let surfaces = [
@@ -139,8 +146,8 @@
     function styleFor(f){
       const p = f.properties || {};
       if (f.geometry && f.geometry.type === "Point") {
-        const color = p.color || colorForQuality(p.quality);
-        return { color, fillColor: color, fillOpacity: 0.9, weight: 2 };
+        // pro body se styl nepoužije (vykreslíme marker), vracíme prázdno
+        return {};
       } else {
         const color = p.color || colorForQuality(p.quality);
         return { color, weight: Number(p.width ?? 6), opacity: 0.95 };
@@ -164,7 +171,6 @@
     const lineLayers = []; // we keep refs to update icons on zoom/move
 
     function placeIconsForLine(lineLayer){
-      // clear previous
       if(lineLayer._iconMarkers){
         lineLayer._iconMarkers.forEach(m => iconsLayer.removeLayer(m));
         lineLayer._iconMarkers = null;
@@ -174,7 +180,6 @@
       const sMap = surfacesByName();
       let surf = sMap[p.surface];
       if(!surf){
-        // fallback z properties nebo heuristiky
         surf = { name:p.surface||'povrch', icon: p.surfaceIcon || ICON_HEUR(p.surface), repeat: Number(p.surfaceRepeat||28) };
       }
       const repeat = Math.max(8, Number(surf.repeat||28));
@@ -212,9 +217,7 @@
       lineLayer._iconMarkers = markers;
     }
 
-    function updateAllIcons(){
-      lineLayers.forEach(l => placeIconsForLine(l));
-    }
+    function updateAllIcons(){ lineLayers.forEach(l => placeIconsForLine(l)); }
     map.on('zoomend moveend', updateAllIcons);
 
     function renderLegend(){
@@ -234,6 +237,19 @@
         const iconbox=document.createElement("span"); iconbox.className="iconbox"; iconbox.innerHTML=ICON_SVGS[s.icon]||ICON_SVGS.dot;
         chip.appendChild(iconbox);
         chip.appendChild(Object.assign(document.createElement("span"),{textContent:s.name}));
+        wrap.appendChild(chip);
+      });
+      // point icons (fixní sada)
+      const pointLegend = [
+        ["warning","pozor"],["speed_bump","retardér"],["zavora","závora"],["railcross","přejezd"],["pin","bod"]
+      ];
+      pointLegend.forEach(([key,label])=>{
+        const chip=document.createElement("div"); chip.className="chip";
+        const size=18;
+        const html=`<div class="pticon" style="width:${size}px;height:${size}px;color:${POINT_COLOR}">${POINT_ICONS[key]}</div>`;
+        const iconbox=document.createElement("span"); iconbox.className="iconbox"; iconbox.innerHTML=html;
+        chip.appendChild(iconbox);
+        chip.appendChild(Object.assign(document.createElement("span"),{textContent:label}));
         wrap.appendChild(chip);
       });
     }
@@ -257,13 +273,23 @@
 
         const layer = L.geoJSON(data, {
           style: styleFor,
-          pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 6, ...styleFor(f) }),
+          // >>> Bod = MARKER s piktogramem (dřív byl circleMarker)
+          pointToLayer: (f, latlng) => {
+            const p = f.properties || {};
+            return L.marker(latlng, { icon: pointDivIcon(p) });
+          },
           onEachFeature: (feature, layer) => {
             const p = feature.properties || {};
             const lines = [];
-            if (p.surface) lines.push(`<b>${p.surface}</b>`);
-            if (p.quality) lines.push(`<span style="color:${colorForQuality(p.quality)}">${p.quality}</span>`);
-            if (p.tag) lines.push(`<i>${p.tag}</i>`);
+            if (feature.geometry.type === "Point") {
+              // do popupu krátce napiš typ bodu
+              const lbl = POINT_LABELS[p.pointIcon] || "bod";
+              lines.push(`<b>${lbl}</b>`);
+            } else {
+              if (p.surface) lines.push(`<b>${p.surface}</b>`);
+              if (p.quality) lines.push(`<span style="color:${colorForQuality(p.quality)}">${p.quality}</span>`);
+            }
+            if (p.tag)  lines.push(`<i>${p.tag}</i>`);
             if (p.note) lines.push(p.note.replace(/</g,"&lt;"));
             if (lines.length) layer.bindPopup(lines.join("<br>"));
 
@@ -290,5 +316,4 @@
     loadGeoJSON(DATA_URL);
   </script>
 </body>
-  
 </html>
