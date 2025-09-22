@@ -9,6 +9,7 @@
     html, body { height:100%; margin:0 }
     #map { height:100% }
 
+    /* Horní banner */
     #banner {
       position:fixed; top:10px; left:50%; transform:translateX(-50%);
       background:#111827; color:#e5e7eb; padding:8px 12px; border-radius:10px;
@@ -29,6 +30,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      backdrop-filter: saturate(120%) blur(4px);
     }
     #legend .title {
       font-size: 13px; color: #111827; font-weight: 600; white-space: nowrap;
@@ -54,6 +56,9 @@
       padding: 6px 8px; border-radius: 8px; cursor: pointer; white-space: nowrap;
     }
     #legend.collapsed { height: 38px; overflow: hidden; }
+    /* Rezerva dole, ať není popup pod lištou nepraktický */
+    .leaflet-bottom { bottom: 56px; }
+    @media (max-width: 520px){ #legend { padding: 6px 8px } .leaflet-bottom { bottom: 50px } }
   </style>
 </head>
 <body>
@@ -69,17 +74,21 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // === NASTAVENÍ ===
-    const DRIVE_FILE_ID = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb"; // tvoje ID
-    const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ"; // vlož svůj API key
+    // === NASTAVENÍ ZDROJE DAT ===
+    // 1) Google Drive API varianta (změň si ID a KEY, nebo nech prázdné)
+    const DRIVE_FILE_ID  = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb"; // <- tvoje ID souboru na Drive
+    const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ";         // <- tvůj API key
     const DRIVE_DATA_URL = `https://www.googleapis.com/drive/v3/files/${DRIVE_FILE_ID}?alt=media&key=${GOOGLE_API_KEY}`;
+
+    // 2) Fallback na soubor v repu (nahraj do stejného repa např. data.geojson)
     const LOCAL_DATA_URL = "./data.geojson";
 
-    // Volitelný override ?data=ENCODED_URL
+    // 3) Volitelný override ?data=ENCODED_URL (např. jiný Drive/Raw GitHub)
     const urlParams = new URLSearchParams(location.search);
     const override = urlParams.get("data");
-    const DATA_URL = override ? decodeURIComponent(override)
-                    : (GOOGLE_API_KEY && GOOGLE_API_KEY !== "PASTE_YOUR_API_KEY_HERE" ? DRIVE_DATA_URL : LOCAL_DATA_URL);
+    const DATA_URL = override
+      ? decodeURIComponent(override)
+      : (GOOGLE_API_KEY && GOOGLE_API_KEY !== "PASTE_YOUR_API_KEY_HERE" ? DRIVE_DATA_URL : LOCAL_DATA_URL);
 
     // === MAPA ===
     const map = L.map("map").setView([50.0755,14.4378], 13);
@@ -88,17 +97,20 @@
       attribution: "&copy; OpenStreetMap přispěvatelé"
     }).addTo(map);
 
-    // === STYL, který respektuje exportované barvy/šířky ===
+    // === Styl: preferuj explicitní barvy/šířky z dat ===
     function styleFor(f){
       const p = f.properties || {};
       if (f.geometry && f.geometry.type === "Point") {
+        // body: color -> marker-color -> stroke -> fallback
         const color = p.color || p["marker-color"] || p.stroke || "#38bdf8";
         return { color, fillColor: color, fillOpacity: 0.9, weight: 2 };
       } else {
+        // linie: color -> stroke; width -> stroke-width; jinak fallback heuristiky
         let color = p.color || p.stroke;
         let width = Number(p.width ?? p["stroke-width"] ?? 5);
+
         if (!color) {
-          // Fallback na heuristiky, jen když chybí explicitní barva
+          // Fallback jen když v datech barva chybí
           color = "#84cc16";
           if (p.surface === "asfalt" && p.condition === "hladký") color = "#22c55e";
           else if (p.surface === "dlažba") color = "#f59e0b";
@@ -117,28 +129,47 @@
       if (!isError) setTimeout(()=> b.remove(), 1800);
     }
 
-    // === LEGEND BUILDER ===
+    // === LEGEND ===
     function buildLegendFromMeta(meta){
-      if (!meta || !Array.isArray(meta.categories)) return null;
+      // použij jen pokud meta.categories existují A nejsou prázdné
+      if (!meta || !Array.isArray(meta.categories) || meta.categories.length === 0) return null;
       return meta.categories.map(c => ({
         key: c.name || c.id || "Kategorie",
         color: c.color || "#999",
       }));
     }
+
     function deriveLegendFromFeatures(features){
-      const mapByKey = new Map();
-      for (const f of (features||[])) {
+      const list = Array.isArray(features) ? features : [];
+      if (!list.length) return [];
+
+      // Název -> barva, a fallback barva -> label
+      const byName = new Map();
+      const byColor = new Map();
+
+      for (const f of list) {
         const p = f.properties || {};
-        const key = p.categoryName || p.surface || p.condition || "Bez kategorie";
-        // určete barvu stejně jako styleFor
         const s = styleFor(f);
         const color = (f.geometry && f.geometry.type === "Point")
-          ? (p.color || p["marker-color"] || p.stroke || s.color)
-          : (p.color || p.stroke || s.color);
-        if (!mapByKey.has(key)) mapByKey.set(key, color);
+          ? (p.color || p["marker-color"] || p.stroke || s.color || "#999")
+          : (p.color || p.stroke || s.color || "#999");
+
+        // zkus název v pořadí:
+        const name = p.categoryName || p.surface || p.condition || p.categoryId || null;
+
+        if (name) {
+          if (!byName.has(name)) byName.set(name, color);
+        } else {
+          if (!byColor.has(color)) byColor.set(color, `Barva ${color}`);
+        }
       }
-      return Array.from(mapByKey.entries()).map(([key, color]) => ({ key, color }));
+
+      const items = [];
+      for (const [key, color] of byName.entries()) items.push({ key, color });
+      for (const [color, label] of byColor.entries()) items.push({ key: label, color });
+      return items;
     }
+
     function renderLegend(items){
       const wrap = document.getElementById("legendItems");
       wrap.innerHTML = "";
@@ -171,14 +202,15 @@
       document.getElementById("legendToggle").textContent = collapsed ? "Zobrazit" : "Skrýt";
     });
 
+    // === Načtení dat ===
     async function loadGeoJSON(url){
       try{
-        const bust = (url.includes("?") ? "&" : "?") + "t=" + Date.now();
+        const bust = (url.includes("?") ? "&" : "?") + "t=" + Date.now(); // cache-bust
         const res = await fetch(url + bust, { mode:"cors" });
         if(!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
         const data = await res.json();
 
-        // Vykreslení
+        // Vykreslení vrstev
         const layer = L.geoJSON(data, {
           style: styleFor,
           pointToLayer: (f, latlng) => {
@@ -208,8 +240,10 @@
           if (bb.isValid()) map.fitBounds(bb.pad(0.1));
         }catch{}
 
-        // Legenda z meta.categories nebo z features
-        const legendItems = buildLegendFromMeta(data.meta) || deriveLegendFromFeatures(data.features);
+        // Legenda: nejprve meta.categories (jen když nejsou prázdné), jinak z feature-dat
+        const metaItems = buildLegendFromMeta(data?.meta);
+        const featItems = deriveLegendFromFeatures(data?.features);
+        const legendItems = (metaItems && metaItems.length) ? metaItems : featItems;
         renderLegend(legendItems);
 
         showBanner("Načteno ✔");
