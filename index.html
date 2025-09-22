@@ -6,7 +6,8 @@
   <title>Mapa povrchů pro longboard</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    html, body, #map { height:100%; margin:0; }
+    html, body { height:100%; margin:0; }
+    #map { height:100%; width:100%; }
   </style>
 </head>
 <body>
@@ -14,36 +15,58 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // 🔗 Sem dej odkaz na svůj veřejně sdílený GeoJSON soubor z Google Disku
-    const DATA_URL = "https://drive.google.com/file/d/1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb/view?usp=sharing";
+    // Raw link na tvůj soubor GeoJSON na Google Drive
+    const FILE_ID = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb";
+    const DATA_URL = `https://drive.google.com/uc?export=download&id=${FILE_ID}`;
 
     const map = L.map("map").setView([50.0755,14.4378], 13);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; <a href='https://www.openstreetmap.org/copyright'>OSM</a>"
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap přispěvatelé"
     }).addTo(map);
 
-    // Funkce pro načtení GeoJSON
-    function loadGeoJSON(url) {
+    function styleFor(feature){
+      const p = feature.properties || {};
+      if(feature.geometry && feature.geometry.type === "Point"){
+        return { color: p.color || "#38bdf8", weight: 2 };
+      }
+      let color = "#84cc16";
+      if(p.surface === "asfalt" && p.condition === "hladký") color = "#22c55e";
+      else if(p.surface === "dlažba") color = "#f59e0b";
+      if(p.condition === "výtluky" || p.condition === "nebezpečné") color = "#ef4444";
+      if(p.surface === "štěrk") color = "#a3a3a3";
+      return { color, weight: p.width || 5, opacity: 0.95 };
+    }
+
+    function loadGeoJSON(url){
       fetch(url)
-        .then(r => r.json())
-        .then(data => {
-          L.geoJSON(data, {
-            onEachFeature: (feature, layer) => {
-              let p = feature.properties || {};
-              let popup = `<b>${p.surface || ""}</b><br>${p.condition || ""}<br>${p.note || ""}`;
-              layer.bindPopup(popup);
-            },
-            style: f => ({ color: f.properties?.color || "red", weight: f.properties?.width || 4 }),
-            pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+        .then(resp => {
+          if(!resp.ok) throw new Error("HTTP error " + resp.status);
+          return resp.json();
+        })
+        .then(fc => {
+          L.geoJSON(fc, {
+            style: styleFor,
+            pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
               radius: 6,
-              color: f.properties?.color || "blue",
+              color: styleFor(feature).color,
               weight: 2
-            })
+            }),
+            onEachFeature: (feature, layer) => {
+              const p = feature.properties || {};
+              const popup = `
+                <b>${p.surface || ""}</b><br>
+                ${p.condition || ""}<br>
+                ${p.note || ""}
+              `;
+              layer.bindPopup(popup);
+            }
           }).addTo(map);
         })
         .catch(err => {
           console.error("Chyba při načítání GeoJSON:", err);
+          alert("Nepodařilo se načíst data GeoJSON. Zkontroluj, jestli je soubor veřejně sdílený a link správný.");
         });
     }
 
