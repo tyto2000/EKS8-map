@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mapa povrchů – viewer (ikony jako v editoru)</title>
+  <title>Mapa povrchů – viewer (barvy + ikony)</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     html, body { height:100%; margin:0 }
     #map { height:100% }
+
     #banner {
       position:fixed; top:10px; left:50%; transform:translateX(-50%);
       background:#111827; color:#e5e7eb; padding:8px 12px; border-radius:10px;
@@ -15,231 +16,135 @@
     }
     #banner.error { background:#7f1d1d }
     #banner small { color:#9ca3af }
-    .legend {
-      position:fixed; left:0; right:0; bottom:0; z-index:900;
-      background:rgba(17,24,39,.85); color:#e5e7eb; font-family:system-ui,sans-serif;
-      padding:6px 10px; border-top:1px solid rgba(255,255,255,.12); backdrop-filter:blur(4px);
-      display:flex; gap:10px; align-items:center; overflow:auto;
+
+    /* Spodní lišta – legenda */
+    #legend {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,.96);
+      border-top: 1px solid #e5e7eb;
+      padding: 8px 10px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+      z-index: 1001;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      backdrop-filter: saturate(120%) blur(4px);
     }
-    .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 8px;
-      border-radius:999px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.04); white-space:nowrap; font-size:12px }
-    .sw { width:14px; height:14px; border-radius:50%; border:1px solid rgba(255,255,255,.25) }
-    .iconbox { width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center }
-    .pticon { display:inline-flex; align-items:center; justify-content:center }
+    #legend .title {
+      font-size: 13px; color: #111827; font-weight: 600; white-space: nowrap;
+    }
+    #legend .items {
+      display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      flex: 1;
+    }
+    #legend .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 999px;
+      background: #fff; font-size: 12px; color: #111827; white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,.06);
+    }
+    #legend .sw {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 1px solid rgba(0,0,0,.15);
+      flex: 0 0 auto;
+    }
+    .iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
+    .iconbox svg{display:block}
+
+    /* Rezerva dole, ať není popup pod lištou nepraktický */
+    .leaflet-bottom { bottom: 56px; }
+    @media (max-width: 520px){ #legend { padding: 6px 8px } .leaflet-bottom { bottom: 50px } }
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <div id="banner">Načítám poznámky… <small>(když to padne, zkontroluj API key / sdílení / odkaz)</small></div>
-  <div id="legend" class="legend" style="display:none"></div>
+  <div id="banner">Načítám data… <small>(když to padne, zkontroluj API key / sdílení / odkaz)</small></div>
+
+  <!-- Spodní legenda -->
+  <div id="legend" class="">
+    <div class="title">Legenda</div>
+    <div class="items" id="legendItems"></div>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // === NASTAVENÍ ZDROJE DAT (stejné chování jako dřív) ===
-    const DRIVE_FILE_ID = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb";   // tvoje ID
-    const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ"; // tvůj key
+    // === NASTAVENÍ ===
+    // 1) Google Drive API (změň si ID + KEY, nebo ponech prázdné a použij local)
+    const DRIVE_FILE_ID  = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb"; // tvoje ID
+    const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ";         // tvůj API key
     const DRIVE_DATA_URL = `https://www.googleapis.com/drive/v3/files/${DRIVE_FILE_ID}?alt=media&key=${GOOGLE_API_KEY}`;
+
+    // 2) Fallback na soubor v repu (nahraj do stejného repa data.geojson)
     const LOCAL_DATA_URL = "./data.geojson";
+
+    // 3) Volitelně můžeš přepsat zdroj parametrem ?data=ENCODED_URL
     const urlParams = new URLSearchParams(location.search);
     const override = urlParams.get("data");
     const DATA_URL = override ? decodeURIComponent(override)
                     : (GOOGLE_API_KEY && GOOGLE_API_KEY !== "PASTE_YOUR_API_KEY_HERE" ? DRIVE_DATA_URL : LOCAL_DATA_URL);
 
-    // === MAPA ===
-    const map = L.map("map").setView([50.0755,14.4378], 13);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 20, attribution: "&copy; OpenStreetMap přispěvatelé"
-    }).addTo(map);
-
-    const drawn = new L.FeatureGroup().addTo(map);     // GeoJSON vrstvy
-    const iconsLayer = new L.FeatureGroup().addTo(map); // ikonky po čáře
-
-    // === SVG knihovna pro POVRCHY (stejné jako v editoru) ===
+    // === ICON LIB (musí sedět s editorem) ===
     const ICON_SVGS = {
       dot:   '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
-      brick: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="8" fill="#fff" stroke="#111" stroke-width="1"/><path d="M2 8 H14 M6 4 V8 M10 8 V12" stroke="#111" stroke-width="1"/></svg>',
-      pebble:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="8" r="2.4" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="6" r="1.9" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="11" r="1.5" fill="#fff" stroke="#111" stroke-width="1"/></svg>',
+      square:'<svg width="16" height="16" viewBox="0 0 16 16"><rect x="4.2" y="4.2" width="7.6" height="7.6" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
+      diamond:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2 L14 8 L8 14 L2 8 Z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
+      triangle:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 3 L13 13 H3 Z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
+      star:  '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2 L9.9 6.5 L15 6.5 L10.7 9.6 L12.5 14 L8 11.2 L3.5 14 L5.3 9.6 L1 6.5 L6.1 6.5 Z" fill="#fff" stroke="#111" stroke-width="1.1"/></svg>',
       stairs:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 12 H12 V10 H10 V8 H8 V6 H6 V4 H4 Z" fill="#fff" stroke="#111" stroke-width="1.1"/></svg>',
+      brick: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="8" fill="#fff" stroke="#111" stroke-width="1"/><path d="M2 8 H14 M6 4 V8 M10 8 V12" stroke="#111" stroke-width="1"/></svg>',
       plank: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 5 H14 M2 8 H14 M2 11 H14" stroke="#111" stroke-width="1.6"/></svg>',
-      triangle:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 3 L13 13 H3 Z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>'
+      pebble:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="8" r="2.4" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="6" r="1.9" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="11" r="1.5" fill="#fff" stroke="#111" stroke-width="1"/></svg>'
     };
-    const ICON_LABELS = {
-      dot:"tečka (asfalt)", brick:"„cihla“", pebble:"štěrk", stairs:"schody", plank:"„prkna“", triangle:"trojúhelník/hlína"
-    };
-
-    // === SVG piktogramy BODŮ (stejné jako v editoru) ===
-    const POINT_COLOR = "#ef4444";
-    const POINT_ICONS = {
-      warning:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 3L2.5 20h19L12 3z" fill="white" stroke="currentColor" stroke-width="2"/><path d="M12 8v6M12 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
-      speed_bump:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M3 16h18" stroke="currentColor" stroke-width="2"/><path d="M4 16c4-6 12-6 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
-      zavora:'<svg viewBox="0 0 24 24" width="100%" height="100%"><rect x="4" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="17" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="5" y="9" width="14" height="4" rx="1" fill="white" stroke="currentColor" stroke-width="2"/><path d="M6 9.5 L9 12.5 M9 9.5 L12 12.5 M12 9.5 L15 12.5 M15 9.5 L18 12.5" stroke="currentColor" stroke-width="2"/></svg>',
-      railcross:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 5 L19 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M5 5 L19 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
-      pin:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 22s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z" fill="white" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></svg>'
+    const ICON_HEUR = (name)=>{
+      const n=(name||'').toLowerCase();
+      if(n.includes('dlaž')||n.includes('kost')) return 'brick';
+      if(n.includes('schod')) return 'stairs';
+      if(n.includes('prach')||n.includes('štěrk')) return 'pebble';
+      if(n.includes('dřevo')||n.includes('lávk')) return 'plank';
+      if(n.includes('hlín')) return 'triangle';
+      return 'dot';
     };
 
-    // === util: divIcony ===
-    function lineIcon(key){
+    // === Model z dat (meta) nebo fallback ===
+    let surfaces = [
+      {name:'asfalt', icon:'dot', repeat:28},
+      {name:'dlažba / kostky', icon:'brick', repeat:28},
+      {name:'štěrk / prach', icon:'pebble', repeat:28},
+      {name:'schody', icon:'stairs', repeat:32},
+      {name:'dřevo / lávka', icon:'plank', repeat:32},
+      {name:'hlína', icon:'triangle', repeat:30}
+    ];
+    let qualities = [
+      {name:'hladký', color:'#22c55e'},
+      {name:'ok', color:'#f59e0b'},
+      {name:'výtluky', color:'#ef4444'},
+      {name:'nebezpečí', color:'#111827'}
+    ];
+
+    const surfacesByName = ()=>Object.fromEntries(surfaces.map(s=>[s.name,s]));
+    const qualitiesByName = ()=>Object.fromEntries(qualities.map(q=>[q.name,q]));
+
+    function colorForQuality(qname){
+      const map = qualitiesByName();
+      return map[qname]?.color || '#38bdf8';
+    }
+
+    function iconFor(key){
       const html = ICON_SVGS[key] || ICON_SVGS.dot;
-      return L.divIcon({ html, className:"", iconSize:[16,16], iconAnchor:[8,8] });
-    }
-    function pointDivIcon(props){
-      const size = Math.max(16, Math.min(48, Number(props.pointSize || 24)));
-      const key  = props.pointIcon || "warning";
-      const svg  = POINT_ICONS[key] || POINT_ICONS.warning;
-      const html = `<div class="pticon" style="width:${size}px;height:${size}px;color:${POINT_COLOR}">${svg}</div>`;
-      return L.divIcon({ html, className:"", iconSize:[size,size], iconAnchor:[size/2,size/2] });
+      return L.divIcon({ html, className:'', iconSize:[16,16], iconAnchor:[8,8] });
     }
 
-    // === metadata z exportu (pro barvy/ikonky/legendu) ===
-    let metaSurfaces = null;  // [{name, icon, repeat}]
-    let metaQualities = null; // [{name, color}]
-
-    function getQualityColor(qName){
-      if(metaQualities){
-        const q = metaQualities.find(x=>x.name===qName);
-        if(q) return q.color;
-      }
-      // fallback
-      if(qName==="hladký") return "#22c55e";
-      if(qName==="ok")      return "#f59e0b";
-      if(qName==="výtluky") return "#ef4444";
-      if(qName==="nebezpečí")return "#111827";
-      return "#38bdf8";
-    }
-
-    function guessSurfaceIcon(surfaceName){
-      const s = (surfaceName||"").toLowerCase();
-      if (s.includes("dlaž") || s.includes("kostk")) return "brick";
-      if (s.includes("štěrk") || s.includes("prach")) return "pebble";
-      if (s.includes("schod")) return "stairs";
-      if (s.includes("dřevo") || s.includes("lávk")) return "plank";
-      if (s.includes("hlín") || s.includes("nezpev")) return "triangle";
-      return "dot"; // asfalt a default
-    }
-
-    function getSurfaceDef(props){
-      // 1) z properties (export editoru)
-      if (props.surfaceIcon || props.surfaceRepeat){
-        return { icon: props.surfaceIcon || guessSurfaceIcon(props.surface), repeat: Number(props.surfaceRepeat||28) };
-      }
-      // 2) z meta.surfaces jménem
-      if (metaSurfaces){
-        const byName = metaSurfaces.find(s=>s.name===props.surface);
-        if(byName) return { icon: byName.icon, repeat: Number(byName.repeat||28) };
-      }
-      // 3) fallback podle názvu
-      return { icon: guessSurfaceIcon(props.surface), repeat: 28 };
-    }
-
-    // === vykreslení ikonek po čáře ===
-    function placeIconsForLine(lineLayer){
-      if(lineLayer._iconMarkers){
-        lineLayer._iconMarkers.forEach(m => iconsLayer.removeLayer(m));
-        lineLayer._iconMarkers = null;
-      }
-      const f = lineLayer.feature || lineLayer.toGeoJSON();
+    function styleFor(f){
       const p = f.properties || {};
-      const def = getSurfaceDef(p);
-      const repeat = Math.max(8, Number(def.repeat||28));
-      const icon = lineIcon(def.icon);
-
-      const latlngs = lineLayer.getLatLngs();
-      if(!Array.isArray(latlngs) || latlngs.length < 2) return;
-      const pts = latlngs.flat ? latlngs.flat() : latlngs;
-
-      const pix = pts.map(ll => map.latLngToLayerPoint(ll));
-      let segLens = []; let total = 0;
-      for(let i=0;i<pix.length-1;i++){
-        const len = Math.hypot(pix[i+1].x-pix[i].x, pix[i+1].y-pix[i].y);
-        segLens.push(len); total += len;
-      }
-      if(total < 4) return;
-
-      const markers = [];
-      for(let d=0; d<=total; d+=repeat){
-        let acc = 0, idx = -1;
-        for(let i=0;i<segLens.length;i++){ if(acc + segLens[i] >= d){ idx=i; break } acc += segLens[i]; }
-        if(idx < 0) continue;
-        const A = pix[idx], B = pix[idx+1], L = segLens[idx];
-        const t = L ? (d - acc)/L : 0;
-        const x = A.x + (B.x - A.x)*t, y = A.y + (B.y - A.y)*t;
-        const ll = map.layerPointToLatLng(L.point(x,y));
-        const m = L.marker(ll, { icon, interactive:false, keyboard:false });
-        iconsLayer.addLayer(m); markers.push(m);
-      }
-      lineLayer._iconMarkers = markers;
-    }
-    function updateAllLineIcons(){
-      drawn.eachLayer(l => { if(l instanceof L.Polyline && !(l instanceof L.Polygon)) placeIconsForLine(l); });
-    }
-    map.on("zoomend moveend", updateAllLineIcons);
-
-    // === styly a popupy ===
-    function styleFor(feature){
-      const p = feature.properties || {};
-      if (feature.geometry && feature.geometry.type === "Point") return {};
-      const color = p.color || getQualityColor(p.quality);
-      const width = Number(p.width || 6);
-      return { color, weight: width, opacity: .95 };
-    }
-
-    function onEachFeature(feature, layer){
-      const p = feature.properties || {};
-      const lines = [];
-      if (feature.geometry.type === "Point"){
-        if (p.pointIcon) lines.push(`<b>${p.pointIcon}</b>`);
+      if (f.geometry && f.geometry.type === "Point") {
+        const color = p.color || colorForQuality(p.quality);
+        return { color, fillColor: color, fillOpacity: 0.9, weight: 2 };
       } else {
-        if (p.surface) lines.push(`<b>${p.surface}</b>`);
-        if (p.quality) lines.push(p.quality);
+        const color = p.color || colorForQuality(p.quality);
+        return { color, weight: Number(p.width ?? 6), opacity: 0.95 };
       }
-      if (p.tag) lines.push(`<i>${p.tag}</i>`);
-      if (p.note) lines.push(String(p.note).replace(/</g,"&lt;"));
-      if (lines.length) layer.bindPopup(lines.join("<br>"));
-
-      // dodatečné: osazení ikonek po čáře
-      if(layer instanceof L.Polyline && !(layer instanceof L.Polygon)){
-        placeIconsForLine(layer);
-      }
-    }
-
-    function pointToLayer(feature, latlng){
-      const p = feature.properties || {};
-      return L.marker(latlng, { icon: pointDivIcon(p) });
-    }
-
-    // === legenda ===
-    function renderLegend(){
-      const bar = document.getElementById("legend");
-      bar.innerHTML = "";
-      if(!metaQualities && !metaSurfaces) { bar.style.display="none"; return; }
-      bar.style.display = "flex";
-
-      // kvality
-      (metaQualities||[]).forEach(q=>{
-        const chip = document.createElement("span");
-        chip.className = "chip";
-        chip.innerHTML = `<span class="sw" style="background:${q.color}"></span><span>${q.name}</span>`;
-        bar.appendChild(chip);
-      });
-
-      // povrchy
-      (metaSurfaces||[]).forEach(s=>{
-        const chip = document.createElement("span");
-        chip.className = "chip";
-        const icon = ICON_SVGS[s.icon] || ICON_SVGS.dot;
-        chip.innerHTML = `<span class="iconbox">${icon}</span><span>${s.name}</span>`;
-        bar.appendChild(chip);
-      });
-
-      // piktogramy bodů (fixní sada)
-      const POINT_LABELS = { warning:"pozor", speed_bump:"retardér", zavora:"závora", railcross:"přejezd", pin:"bod" };
-      ["warning","speed_bump","zavora","railcross","pin"].forEach(k=>{
-        const chip = document.createElement("span");
-        chip.className = "chip";
-        const svg = POINT_ICONS[k];
-        chip.innerHTML = `<span class="iconbox"><div class="pticon" style="width:18px;height:18px;color:${POINT_COLOR}">${svg}</div></span><span>${POINT_LABELS[k]}</span>`;
-        bar.appendChild(chip);
-      });
     }
 
     function showBanner(msg, isError=false){
@@ -249,40 +154,132 @@
       if (!isError) setTimeout(()=> b.remove(), 1800);
     }
 
-    // === Načtení dat ===
+    const map = L.map("map").setView([50.0755,14.4378], 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 20,
+      attribution: "&copy; OpenStreetMap přispěvatelé"
+    }).addTo(map);
+
+    const iconsLayer = new L.FeatureGroup().addTo(map);
+    const lineLayers = []; // we keep refs to update icons on zoom/move
+
+    function placeIconsForLine(lineLayer){
+      // clear previous
+      if(lineLayer._iconMarkers){
+        lineLayer._iconMarkers.forEach(m => iconsLayer.removeLayer(m));
+        lineLayer._iconMarkers = null;
+      }
+      const f = lineLayer.feature || lineLayer.toGeoJSON();
+      const p = f.properties || {};
+      const sMap = surfacesByName();
+      let surf = sMap[p.surface];
+      if(!surf){
+        // fallback z properties nebo heuristiky
+        surf = { name:p.surface||'povrch', icon: p.surfaceIcon || ICON_HEUR(p.surface), repeat: Number(p.surfaceRepeat||28) };
+      }
+      const repeat = Math.max(8, Number(surf.repeat||28));
+      const icon = iconFor(surf.icon);
+
+      const latlngs = lineLayer.getLatLngs();
+      if(!Array.isArray(latlngs) || latlngs.length < 2) return;
+      const pts = latlngs.flat ? latlngs.flat() : latlngs;
+
+      const pix = pts.map(ll => map.latLngToLayerPoint(ll));
+      let segLens = []; let total = 0;
+      for(let i=0;i<pix.length-1;i++){
+        const dx = pix[i+1].x - pix[i].x, dy = pix[i+1].y - pix[i].y;
+        const len = Math.hypot(dx,dy); segLens.push(len); total += len;
+      }
+      if(total < 4) return;
+
+      const markers = [];
+      for(let d=0; d<=total; d+=repeat){
+        let acc = 0, segIndex = -1;
+        for(let i=0;i<segLens.length;i++){
+          if(acc + segLens[i] >= d){ segIndex = i; break; }
+          acc += segLens[i];
+        }
+        if(segIndex < 0) continue;
+        const A = pix[segIndex], B = pix[segIndex+1];
+        const segD = segLens[segIndex];
+        const t = segD ? (d - acc) / segD : 0;
+        const x = A.x + (B.x - A.x)*t;
+        const y = A.y + (B.y - A.y)*t;
+        const ll = map.layerPointToLatLng(L.point(x,y));
+        const m = L.marker(ll, { icon, interactive:false, keyboard:false });
+        iconsLayer.addLayer(m); markers.push(m);
+      }
+      lineLayer._iconMarkers = markers;
+    }
+
+    function updateAllIcons(){
+      lineLayers.forEach(l => placeIconsForLine(l));
+    }
+    map.on('zoomend moveend', updateAllIcons);
+
+    function renderLegend(){
+      const wrap = document.getElementById("legendItems");
+      wrap.innerHTML = "";
+      // qualities
+      qualities.forEach(q=>{
+        const chip=document.createElement("div"); chip.className="chip";
+        const sw=document.createElement("span"); sw.className="sw"; sw.style.background=q.color;
+        chip.appendChild(sw);
+        chip.appendChild(Object.assign(document.createElement("span"),{textContent:q.name}));
+        wrap.appendChild(chip);
+      });
+      // surfaces
+      surfaces.forEach(s=>{
+        const chip=document.createElement("div"); chip.className="chip";
+        const iconbox=document.createElement("span"); iconbox.className="iconbox"; iconbox.innerHTML=ICON_SVGS[s.icon]||ICON_SVGS.dot;
+        chip.appendChild(iconbox);
+        chip.appendChild(Object.assign(document.createElement("span"),{textContent:s.name}));
+        wrap.appendChild(chip);
+      });
+    }
+
+    function applyMeta(meta){
+      if(meta){
+        if(Array.isArray(meta.qualities) && meta.qualities.length) qualities = meta.qualities;
+        if(Array.isArray(meta.surfaces) && meta.surfaces.length) surfaces = meta.surfaces;
+      }
+      renderLegend();
+    }
+
     async function loadGeoJSON(url){
       try{
         const bust = (url.includes("?") ? "&" : "?") + "t=" + Date.now();
         const res = await fetch(url + bust, { mode:"cors" });
         if(!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
-        const fc = await res.json();
+        const data = await res.json();
 
-        metaSurfaces  = (fc.meta && Array.isArray(fc.meta.surfaces)) ? fc.meta.surfaces : null;
-        metaQualities = (fc.meta && Array.isArray(fc.meta.qualities)) ? fc.meta.qualities : null;
+        applyMeta(data.meta);
 
-        const layer = L.geoJSON(fc, { style: styleFor, onEachFeature, pointToLayer }).addTo(drawn);
+        const layer = L.geoJSON(data, {
+          style: styleFor,
+          pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 6, ...styleFor(f) }),
+          onEachFeature: (feature, layer) => {
+            const p = feature.properties || {};
+            const lines = [];
+            if (p.surface) lines.push(`<b>${p.surface}</b>`);
+            if (p.quality) lines.push(`<span style="color:${colorForQuality(p.quality)}">${p.quality}</span>`);
+            if (p.tag) lines.push(`<i>${p.tag}</i>`);
+            if (p.note) lines.push(p.note.replace(/</g,"&lt;"));
+            if (lines.length) layer.bindPopup(lines.join("<br>"));
 
-        // dosadíme barvy & ikony i když v datech nejsou kompletní
-        layer.eachLayer(l=>{
-          const f = l.feature || l.toGeoJSON();
-          const p = f.properties || {};
-          if (l instanceof L.Polyline && !(l instanceof L.Polygon)) {
-            const color = p.color || getQualityColor(p.quality);
-            const width = Number(p.width || 6);
-            if(l.setStyle) l.setStyle({ color, weight: width, opacity:.95 });
-            placeIconsForLine(l);
+            if(layer instanceof L.Polyline && !(layer instanceof L.Polygon)){
+              layer.feature = feature; // ensure props on layer
+              lineLayers.push(layer);
+              placeIconsForLine(layer);
+            }
           }
-          if (l instanceof L.Marker) {
-            l.setIcon(pointDivIcon(p));
-          }
-        });
+        }).addTo(map);
 
         try{
           const bb = layer.getBounds();
           if (bb.isValid()) map.fitBounds(bb.pad(0.1));
         }catch{}
 
-        renderLegend();
         showBanner("Načteno ✔");
       }catch(err){
         console.error("Chyba při načítání GeoJSON:", err);
@@ -293,4 +290,5 @@
     loadGeoJSON(DATA_URL);
   </script>
 </body>
+  
 </html>
