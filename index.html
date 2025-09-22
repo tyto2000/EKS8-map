@@ -8,6 +8,7 @@
   <style>
     html, body { height:100%; margin:0 }
     #map { height:100% }
+
     #banner {
       position:fixed; top:10px; left:50%; transform:translateX(-50%);
       background:#111827; color:#e5e7eb; padding:8px 12px; border-radius:10px;
@@ -15,19 +16,66 @@
     }
     #banner.error { background:#7f1d1d }
     #banner small { color:#9ca3af }
+
+    /* Spodní lišta – legenda */
+    #legend {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,.96);
+      border-top: 1px solid #e5e7eb;
+      padding: 8px 10px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+      z-index: 1001;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #legend .title {
+      font-size: 13px; color: #111827; font-weight: 600; white-space: nowrap;
+    }
+    #legend .items {
+      display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      flex: 1;
+    }
+    #legend .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 999px;
+      background: #fff; font-size: 12px; color: #111827; white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,.06);
+    }
+    #legend .swatch {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 1px solid rgba(0,0,0,.15);
+      flex: 0 0 auto;
+    }
+    #legend .toggle {
+      font-size: 12px; color: #374151; background: #f3f4f6; border: 1px solid #e5e7eb;
+      padding: 6px 8px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+    }
+    #legend.collapsed { height: 38px; overflow: hidden; }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <div id="banner">Načítám poznámky… <small>(když to padne, zkontroluj API key / sdílení / odkaz)</small></div>
 
+  <!-- Spodní legenda -->
+  <div id="legend" class="">
+    <div class="title">Legenda</div>
+    <div class="items" id="legendItems"></div>
+    <button class="toggle" id="legendToggle" type="button">Skrýt</button>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     // === NASTAVENÍ ===
-    const DRIVE_FILE_ID = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb";
-    const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ";
+    const DRIVE_FILE_ID = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb"; // tvoje ID
+    const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ"; // vlož svůj API key
     const DRIVE_DATA_URL = `https://www.googleapis.com/drive/v3/files/${DRIVE_FILE_ID}?alt=media&key=${GOOGLE_API_KEY}`;
     const LOCAL_DATA_URL = "./data.geojson";
+
+    // Volitelný override ?data=ENCODED_URL
     const urlParams = new URLSearchParams(location.search);
     const override = urlParams.get("data");
     const DATA_URL = override ? decodeURIComponent(override)
@@ -43,23 +91,20 @@
     // === STYL, který respektuje exportované barvy/šířky ===
     function styleFor(f){
       const p = f.properties || {};
-      // Preferuj explicitní data z exportu
       if (f.geometry && f.geometry.type === "Point") {
         const color = p.color || p["marker-color"] || p.stroke || "#38bdf8";
         return { color, fillColor: color, fillOpacity: 0.9, weight: 2 };
       } else {
         let color = p.color || p.stroke;
         let width = Number(p.width ?? p["stroke-width"] ?? 5);
-
-        // Fallback na tvoje heuristiky, když barva není v datech
         if (!color) {
+          // Fallback na heuristiky, jen když chybí explicitní barva
           color = "#84cc16";
           if (p.surface === "asfalt" && p.condition === "hladký") color = "#22c55e";
           else if (p.surface === "dlažba") color = "#f59e0b";
           if (p.condition === "výtluky" || p.condition === "nebezpečné") color = "#ef4444";
           if (p.surface === "štěrk") color = "#a3a3a3";
         }
-
         const opacity = (typeof p["stroke-opacity"] !== "undefined") ? p["stroke-opacity"] : 0.95;
         return { color, weight: width, opacity };
       }
@@ -72,6 +117,60 @@
       if (!isError) setTimeout(()=> b.remove(), 1800);
     }
 
+    // === LEGEND BUILDER ===
+    function buildLegendFromMeta(meta){
+      if (!meta || !Array.isArray(meta.categories)) return null;
+      return meta.categories.map(c => ({
+        key: c.name || c.id || "Kategorie",
+        color: c.color || "#999",
+      }));
+    }
+    function deriveLegendFromFeatures(features){
+      const mapByKey = new Map();
+      for (const f of (features||[])) {
+        const p = f.properties || {};
+        const key = p.categoryName || p.surface || p.condition || "Bez kategorie";
+        // určete barvu stejně jako styleFor
+        const s = styleFor(f);
+        const color = (f.geometry && f.geometry.type === "Point")
+          ? (p.color || p["marker-color"] || p.stroke || s.color)
+          : (p.color || p.stroke || s.color);
+        if (!mapByKey.has(key)) mapByKey.set(key, color);
+      }
+      return Array.from(mapByKey.entries()).map(([key, color]) => ({ key, color }));
+    }
+    function renderLegend(items){
+      const wrap = document.getElementById("legendItems");
+      wrap.innerHTML = "";
+      if (!items || !items.length) {
+        const span = document.createElement("span");
+        span.textContent = "Žádné kategorie nenalezeny";
+        span.style.color = "#6b7280";
+        span.style.fontSize = "12px";
+        wrap.appendChild(span);
+        return;
+      }
+      for (const it of items) {
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        const sw = document.createElement("span");
+        sw.className = "swatch";
+        sw.style.background = it.color || "#999";
+        chip.appendChild(sw);
+        const label = document.createElement("span");
+        label.textContent = it.key;
+        chip.appendChild(label);
+        wrap.appendChild(chip);
+      }
+    }
+
+    // Toggle legendy
+    document.getElementById("legendToggle").addEventListener("click", () => {
+      const lg = document.getElementById("legend");
+      const collapsed = lg.classList.toggle("collapsed");
+      document.getElementById("legendToggle").textContent = collapsed ? "Zobrazit" : "Skrýt";
+    });
+
     async function loadGeoJSON(url){
       try{
         const bust = (url.includes("?") ? "&" : "?") + "t=" + Date.now();
@@ -79,11 +178,18 @@
         if(!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
         const data = await res.json();
 
+        // Vykreslení
         const layer = L.geoJSON(data, {
           style: styleFor,
           pointToLayer: (f, latlng) => {
             const s = styleFor(f);
-            return L.circleMarker(latlng, { radius: 6, color: s.color, fillColor: s.fillColor || s.color, fillOpacity: s.fillOpacity ?? 0.9, weight: s.weight ?? 2 });
+            return L.circleMarker(latlng, {
+              radius: 6,
+              color: s.color,
+              fillColor: s.fillColor || s.color,
+              fillOpacity: s.fillOpacity ?? 0.9,
+              weight: s.weight ?? 2
+            });
           },
           onEachFeature: (feature, layer) => {
             const p = feature.properties || {};
@@ -96,10 +202,15 @@
           }
         }).addTo(map);
 
+        // Zoom na data
         try{
           const bb = layer.getBounds();
           if (bb.isValid()) map.fitBounds(bb.pad(0.1));
         }catch{}
+
+        // Legenda z meta.categories nebo z features
+        const legendItems = buildLegendFromMeta(data.meta) || deriveLegendFromFeatures(data.features);
+        renderLegend(legendItems);
 
         showBanner("Načteno ✔");
       }catch(err){
