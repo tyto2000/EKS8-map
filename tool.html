@@ -41,6 +41,16 @@
 
     /* mapa zabere zbytek výšky */
     #map{flex:1; min-height:40vh}
+
+    /* jednoduchý dialog (fallback, když pop-upy jsou blokované) */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9999}
+    .modal{background:#0f172a;border:1px solid #22314b;border-radius:14px;max-width:520px;width:92%;padding:16px}
+    .modal h3{margin:0 0 8px 0;font-size:16px}
+    .modal p{margin:0 0 12px 0;color:#cbd5e1;font-size:14px}
+    .copyrow{display:flex;gap:8px}
+    .copyrow input{flex:1;padding:10px;border-radius:10px;border:1px solid #334155;background:#0b1020;color:#e5e7eb}
+    .copyrow button{white-space:nowrap}
+    .modal .closebtn{margin-top:12px;width:100%}
   </style>
 </head>
 <body>
@@ -71,18 +81,87 @@
 
     <!-- odkaz na Google Form (MEZI tlačítky a mapou) -->
     <div class="uploadbar">
-      <a class="uploadbtn" href="https://forms.gle/2VNdXTozK66ZQKUNA" target="_blank" rel="noopener noreferrer">
+      <a class="uploadbtn" id="uploadBtn" href="https://forms.gle/2VNdXTozK66ZQKUNA" target="_blank" rel="noopener noreferrer">
         📤 Zde nahraj geojson soubor, abysme ho zadali do mapy, díky 💚
       </a>
-      <div class="uploadhint">Otevře se ve nové záložce (Google Form).</div>
+      <div class="uploadhint">Pokud se neotevře, použij dialog s odkazem.</div>
     </div>
 
     <!-- mapa -->
     <div id="map"></div>
   </div>
 
+  <!-- Fallback dialog s kopií odkazu -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <h3>Odkaz na nahrání trasy</h3>
+      <p>Vypadá to, že prohlížeč zablokoval otevření nové záložky. Zkopíruj odkaz a otevři ho ručně:</p>
+      <div class="copyrow">
+        <input type="text" id="linkInput" readonly value="https://forms.gle/2VNdXTozK66ZQKUNA">
+        <button id="copyBtn">Kopírovat</button>
+      </div>
+      <button class="closebtn" id="closeModal">Zavřít</button>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
+  /* ====== Robustní otevření formuláře ====== */
+  (function(){
+    const URL_FORM = 'https://forms.gle/2VNdXTozK66ZQKUNA';
+    const a = document.getElementById('uploadBtn');
+    const modal = document.getElementById('modal');
+    const linkInput = document.getElementById('linkInput');
+    const copyBtn = document.getElementById('copyBtn');
+    const closeModal = document.getElementById('closeModal');
+
+    function showModal(){ modal.style.display='flex'; linkInput.focus(); linkInput.select(); }
+    function hideModal(){ modal.style.display='none'; }
+
+    a.addEventListener('click', function(e){
+      // pokus 1: klasické otevření nové záložky
+      let ok = false;
+      try{
+        const w = window.open(URL_FORM, '_blank', 'noopener,noreferrer');
+        if (w) { ok = true; }
+      }catch{}
+
+      // pokus 2: přesměrovat top okno (když jsme v iframu a je to povolené)
+      if(!ok){
+        try{
+          if (window.top && window.top !== window) {
+            // v některých sandboxech funguje při uživatelské akci
+            window.top.location.href = URL_FORM;
+            ok = true;
+          }
+        }catch{}
+      }
+
+      if(!ok){
+        // blokováno -> neztratit klik a ukaž dialog
+        e.preventDefault();
+        showModal();
+      } else {
+        // už jsme otevřeli sami, nenech default akci vytvořit duplicitní tab
+        e.preventDefault();
+      }
+    });
+
+    copyBtn.addEventListener('click', ()=>{
+      linkInput.select(); linkInput.setSelectionRange(0, 99999);
+      try{
+        document.execCommand('copy'); // pro starší iOS
+      }catch{}
+      if (navigator.clipboard && window.isSecureContext){
+        navigator.clipboard.writeText(linkInput.value).catch(()=>{});
+      }
+      copyBtn.textContent = 'Zkopírováno ✓';
+      setTimeout(()=> copyBtn.textContent = 'Kopírovat', 1200);
+    });
+    closeModal.addEventListener('click', hideModal);
+    modal.addEventListener('click', (e)=>{ if(e.target===modal) hideModal(); });
+  })();
+
   // ====== Datové slovníky ======
   const ICON_SVGS = {
     dot:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
