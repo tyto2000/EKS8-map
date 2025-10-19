@@ -1,34 +1,46 @@
-<!DOCTYPE html><html lang="cs">
+<!DOCTYPE html>
+<html lang="cs">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ESK8 – GPS logger (povrch • kvalita • ikony) + Smazat + Live poloha</title>
+  <title>ESK8 – GPS logger (povrch • kvalita • ikony)</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
-    :root{ --bg:#0b1220; --card:#0f172a; --muted:#9ca3af; --txt:#e5e7eb; --border:#1f2937; --acc:#22c55e; --warn:#f59e0b; --err:#ef4444; --blue:#3b82f6; }
+    :root{ --bg:#0b1220; --panel:#0f172a; --muted:#9ca3af; --txt:#e5e7eb; --border:#1f2937; --acc:#22c55e; --warn:#f59e0b; --err:#ef4444; --blue:#3b82f6; }
     *{box-sizing:border-box}
+    html,body{height:100%}
     body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
     .wrap{display:flex;flex-direction:column;min-height:100vh}
-    header{padding:10px 12px;border-bottom:1px solid var(--border);background:#0f172a;display:flex;justify-content:space-between;align-items:center;gap:10px}
+
+    header{padding:10px 12px;border-bottom:1px solid var(--border);background:var(--panel);display:flex;justify-content:space-between;align-items:center;gap:10px}
     h1{margin:0;font-size:16px}
-    .status{font-size:12px;padding:4px 8px;border-radius:999px;background:#111827;border:1px solid var(--border)}.controls{padding:10px 12px;display:grid;gap:8px;background:#0f172a;border-bottom:1px solid var(--border)}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#0b1020;font-size:13px;cursor:pointer;user-select:none}
-.chip.active{outline:2px solid rgba(255,255,255,.06);background:#111b2e}
-.sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
-.iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
+    .status{font-size:12px;padding:4px 8px;border-radius:999px;background:#111827;border:1px solid var(--border)}
 
-#map{height:50vh}
+    /* výběry */
+    .controls{padding:10px 12px;display:grid;gap:8px;background:var(--panel);border-bottom:1px solid var(--border)}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#0b1020;font-size:13px;cursor:pointer;user-select:none}
+    .chip.active{outline:2px solid rgba(255,255,255,.06);background:#111b2e}
+    .sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
+    .iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
 
-.footer{position:sticky;bottom:0;background:rgba(17,24,39,.9);backdrop-filter:blur(6px);border-top:1px solid var(--border);padding:10px 12px}
-.btnbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-button{padding:12px;border-radius:12px;border:1px solid var(--border);background:#111827;color:var(--txt);font:inherit;cursor:pointer}
-button.primary{background:#16a34a;border-color:#16a34a;color:#051807}
-button.warn{background:var(--warn);border-color:var(--warn);color:#1a1300}
-button.danger{background:var(--err);border-color:var(--err);color:#fff}
+    /* akce nad mapou */
+    .actions{padding:10px 12px;background:rgba(17,24,39,.9);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .btnbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+    button{padding:12px;border-radius:12px;border:1px solid var(--border);background:#111827;color:var(--txt);font:inherit;cursor:pointer}
+    button.primary{background:#16a34a;border-color:#16a34a;color:#051807}
+    button.warn{background:var(--warn);border-color:var(--warn);color:#1a1300}
+    button.danger{background:var(--err);border-color:var(--err);color:#fff}
+    .legend{padding:8px 0;color:var(--muted);font-size:12px;border-top:1px dashed #243349;margin-top:8px}
 
-.legend{padding:6px 12px;color:var(--muted);font-size:12px;border-top:1px dashed #243349}
+    /* nahrávací tlačítko mezi akcemi a mapou */
+    .uploadbar{padding:12px; background:#0f172a; border-bottom:1px solid var(--border); text-align:center}
+    .uploadbtn{display:inline-block; padding:12px 18px; background:var(--acc); color:#04230e; font-weight:700; border-radius:12px; text-decoration:none; border:1px solid var(--acc)}
+    .uploadbtn:hover{ filter:brightness(1.05) }
+    .uploadhint{color:var(--muted); font-size:12px; margin-top:6px}
 
+    /* mapa zabere zbytek výšky */
+    #map{flex:1; min-height:40vh}
   </style>
 </head>
 <body>
@@ -36,29 +48,41 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
     <header>
       <h1>ESK8 GPS logger</h1>
       <span id="status" class="status">připraveno</span>
-    </header><!-- 3 řádky voleb -->
-<section class="controls">
-  <div class="row" id="rowSurfaces"></div>
-  <div class="row" id="rowQualities"></div>
-  <div class="row" id="rowIcons"></div>
-</section>
+    </header>
 
-<!-- mapa (dolní půlka) -->
-<div id="map"></div>
+    <!-- 3 řádky voleb -->
+    <section class="controls">
+      <div class="row" id="rowSurfaces"></div>
+      <div class="row" id="rowQualities"></div>
+      <div class="row" id="rowIcons"></div>
+    </section>
 
-<!-- pět tlačítek pod mapou -->
-<section class="footer">
-  <div class="btnbar">
-    <button id="btnStart" class="primary">Start</button>
-    <button id="btnPause" class="warn">Pauza</button>
-    <button id="btnStop" class="danger">Stop</button>
-    <button id="btnExport">Export</button>
-    <button id="btnDelete" class="danger">Smazat</button>
+    <!-- akční tlačítka (NAD mapou) -->
+    <section class="actions">
+      <div class="btnbar">
+        <button id="btnStart" class="primary">Start</button>
+        <button id="btnPause" class="warn">Pauza</button>
+        <button id="btnStop" class="danger">Stop</button>
+        <button id="btnExport">Export</button>
+        <button id="btnDelete" class="danger">Smazat</button>
+      </div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <!-- odkaz na Google Form (MEZI tlačítky a mapou) -->
+    <div class="uploadbar">
+      <a class="uploadbtn" href="https://forms.gle/2VNdXTozK66ZQKUNA" target="_blank" rel="noopener noreferrer">
+        📤 Zde nahraj geojson soubor, abysme ho zadali do mapy, díky 💚
+      </a>
+      <div class="uploadhint">Otevře se ve nové záložce (Google Form).</div>
+    </div>
+
+    <!-- mapa -->
+    <div id="map"></div>
   </div>
-  <div class="legend" id="legend"></div>
-</section>
 
-  </div>  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>  <script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
   // ====== Datové slovníky ======
   const ICON_SVGS = {
     dot:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
@@ -105,7 +129,7 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
       const chip=document.createElement('div'); chip.className='chip'+(s===selSurface?' active':'');
       const icon=document.createElement('span'); icon.className='iconbox'; icon.innerHTML=ICON_SVGS[s.icon]||ICON_SVGS.dot; chip.appendChild(icon);
       chip.appendChild(Object.assign(document.createElement('span'),{textContent:s.name}));
-      chip.addEventListener('click', ()=>{ selSurface=s; renderSurfaces(); if(tracking) startNewSegment('surface-change'); });
+      chip.addEventListener('click', ()=>{ selSurface=s; renderSurfaces(); if(tracking) startNewSegment('surface-change'); renderLegend(); });
       rowSurfaces.appendChild(chip);
     });
   }
@@ -115,7 +139,7 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
       const chip=document.createElement('div'); chip.className='chip'+(q===selQuality?' active':'');
       const sw=document.createElement('span'); sw.className='sw'; sw.style.background=q.color; chip.appendChild(sw);
       chip.appendChild(Object.assign(document.createElement('span'),{textContent:q.name}));
-      chip.addEventListener('click', ()=>{ selQuality=q; renderQualities(); if(tracking) startNewSegment('quality-change'); });
+      chip.addEventListener('click', ()=>{ selQuality=q; renderQualities(); if(tracking) startNewSegment('quality-change'); renderLegend(); });
       rowQualities.appendChild(chip);
     });
   }
@@ -123,7 +147,8 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
     rowIcons.innerHTML='';
     POINT_ICONS.forEach(pi=>{
       const chip=document.createElement('div'); chip.className='chip';
-      const size=18; const html=`<div style="width:${size}px;height:${size}px;color:#ef4444">${pi.svg}</div>`; const box=document.createElement('span'); box.className='iconbox'; box.innerHTML=html; chip.appendChild(box);
+      const size=18; const html=`<div style="width:${size}px;height:${size}px;color:#ef4444">${pi.svg}</div>`;
+      const box=document.createElement('span'); box.className='iconbox'; box.innerHTML=html; chip.appendChild(box);
       chip.appendChild(Object.assign(document.createElement('span'),{textContent:pi.label}));
       chip.addEventListener('click', ()=> addSinglePoint(pi.key));
       rowIcons.appendChild(chip);
@@ -136,14 +161,14 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20, attribution:'&copy; OpenStreetMap'}).addTo(map);
   const linesLayer = L.featureGroup().addTo(map);
   const pointsLayer = L.featureGroup().addTo(map);
-  const iconsLayer = L.featureGroup().addTo(map); // dekorace ikon po čáře
-  const liveLayer = L.layerGroup().addTo(map);   // 🔵 aktuální poloha (marker + kruh)
+  const iconsLayer = L.featureGroup().addTo(map);
+  const liveLayer = L.layerGroup().addTo(map);
 
   function colorForQuality(name){ const q=QUALITIES.find(x=>x.name===name); return q? q.color : '#38bdf8'; }
   function pointDivIcon(p){
     const size=24; const color='#ef4444';
     const meta = POINT_ICONS.find(x=>x.key===p.pointIcon) || POINT_ICONS[0];
-    const html = `<div style=\"width:${size}px;height:${size}px;color:${color}\">${meta.svg}</div>`;
+    const html = `<div style="width:${size}px;height:${size}px;color:${color}">${meta.svg}</div>`;
     return L.divIcon({ html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2] });
   }
   function lineStyle(p){ return { color: colorForQuality(p.quality), weight: 6, opacity:0.95 } }
@@ -152,13 +177,14 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
   function lineIcon(key){ const html=ICON_SVGS[key]||ICON_SVGS.dot; return L.divIcon({ html, className:'', iconSize:[16,16], iconAnchor:[8,8] }); }
   function placeIconsForLine(layer){
     if(layer._iconMarkers){ layer._iconMarkers.forEach(m=>iconsLayer.removeLayer(m)); layer._iconMarkers=null; }
-    const p=layer.feature.properties; const repeat=Math.max(8, Number(p.surfaceRepeat||28));
+    const p=layer.feature.properties;
     const latlngs = layer.getLatLngs(); if(!latlngs || latlngs.length<2) return;
     const pts = latlngs.flat ? latlngs.flat() : latlngs;
     const pix=pts.map(ll=>map.latLngToLayerPoint(ll));
-    let segLens=[]; let total=0; for(let i=0;i<pix.length-1;i++){ const dx=pix[i+1].x-pix[i].x, dy=pix[i+1].y-pix[i].y; const Lseg=Math.hypot(dx,dy); segLens.push(Lseg); total+=Lseg; }
-    const markers=[]; const icon=lineIcon(p.surfaceIcon||selSurface.icon);
-    for(let d=0; d<=total; d+= (p.surfaceRepeat || selSurface.repeat || 28)){
+    let segLens=[]; let total=0;
+    for(let i=0;i<pix.length-1;i++){ const dx=pix[i+1].x-pix[i].x, dy=pix[i+1].y-pix[i].y; const Lseg=Math.hypot(dx,dy); segLens.push(Lseg); total+=Lseg; }
+    const markers=[]; const icon=lineIcon(p.surfaceIcon||selSurface.icon); const repeat = p.surfaceRepeat || selSurface.repeat || 28;
+    for(let d=0; d<=total; d+= repeat){
       let acc=0, k=-1; for(let i=0;i<segLens.length;i++){ if(acc+segLens[i]>=d){k=i;break} acc+=segLens[i]; }
       if(k<0) continue; const A=pix[k], B=pix[k+1]; const t=(d-acc)/(segLens[k]||1); const x=A.x+(B.x-A.x)*t, y=A.y+(B.y-A.y)*t; const ll=map.layerPointToLatLng(L.point(x,y));
       const m=L.marker(ll, { icon, interactive:false, keyboard:false }); iconsLayer.addLayer(m); markers.push(m);
@@ -168,16 +194,17 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
 
   // ====== Geologger + LIVE poloha ======
   let tracking=false, paused=false, watchId=null, previewWatchId=null, lastFix=null;
-  let currentSegment=null; // { layer, coords:[[lon,lat]], times:[iso], props }
-  const features=[]; // hotové segmenty + body
+  let currentSegment=null;
+  const features=[];
 
   let liveMarker=null, liveAccuracy=null;
   function updateLiveMarker(lat, lon, acc){
-    if(!lat || !lon) return;
+    if(typeof lat!=='number' || typeof lon!=='number') return;
     const ll=[lat,lon];
+    const blue = getComputedStyle(document.documentElement).getPropertyValue('--blue').trim() || '#3b82f6';
     if(!liveMarker){
-      liveMarker = L.circleMarker(ll, { radius:6, color:'var(--blue)', fill:true, fillOpacity:1, weight:2 });
-      liveAccuracy = L.circle(ll, { radius: Math.max(5, acc||10), color:'var(--blue)', weight:1, fillOpacity:.08 });
+      liveMarker = L.circleMarker(ll, { radius:6, color: blue, fill:true, fillOpacity:1, weight:2 });
+      liveAccuracy = L.circle(ll, { radius: Math.max(5, acc||10), color: blue, weight:1, fillOpacity:.08 });
       liveMarker.addTo(liveLayer); liveAccuracy.addTo(liveLayer);
     } else {
       liveMarker.setLatLng(ll);
@@ -190,7 +217,12 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
 
   function startNewSegment(reason){
     if(currentSegment && currentSegment.coords.length>1){ finalizeSegment(); }
-    const props={ type:'LineString', surface: selSurface.name, surfaceIcon: selSurface.icon, surfaceRepeat: selSurface.repeat, quality: selQuality.name, color: colorForQuality(selQuality.name), width:6, createdAt: new Date().toISOString(), reason };
+    const props={
+      type:'LineString',
+      surface: selSurface.name, surfaceIcon: selSurface.icon, surfaceRepeat: selSurface.repeat,
+      quality: selQuality.name, color: colorForQuality(selQuality.name), width:6,
+      createdAt: new Date().toISOString(), reason
+    };
     const layer=L.polyline([], lineStyle(props)).addTo(linesLayer);
     const feat={ type:'Feature', properties: props, geometry:{ type:'LineString', coordinates:[] } };
     layer.feature=feat;
@@ -204,7 +236,7 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
     layer.feature.properties.times = times.slice();
     layer.setStyle(lineStyle(props));
     placeIconsForLine(layer);
-    features.push(layer.feature); // uložit jako hotovo
+    features.push(layer.feature);
     currentSegment=null;
   }
 
@@ -214,10 +246,10 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
     if(!tracking || paused) return;
     if(!currentSegment) startNewSegment('first-fix');
 
-    // filtr 3 m
+    // krok ~3 m
     if(currentSegment.coords.length){
       const prev=currentSegment.coords[currentSegment.coords.length-1];
-      const d=haversine(prev[0], prev[1], c.lon, c.lat); // lon,lat pořadí
+      const d=haversine(prev[0], prev[1], c.lon, c.lat);
       if(d<3) return;
     }
     currentSegment.coords.push([c.lon, c.lat]);
@@ -226,7 +258,7 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
   }
   function onError(err){ setStatus('chyba geolokace', 'var(--err)'); console.warn(err); }
 
-  // 🧭 PREVIEW watch – běží před Start, aby byla vidět poloha
+  // preview poloha (před startem)
   function startPreviewWatch(){
     if(!('geolocation' in navigator)) return;
     if(previewWatchId!=null) return;
@@ -240,21 +272,26 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
 
   function start(){
     if(tracking) return; tracking=true; paused=false; setStatus('běží','var(--acc)');
-    // přepneme z preview na tracking, ať neběží dva watchery
     stopPreviewWatch();
     if(!watchId){ watchId = navigator.geolocation.watchPosition(onPosition, onError, { enableHighAccuracy:true, maximumAge:3000, timeout:20000 }); }
     if(lastFix){ map.setView([lastFix.lat,lastFix.lon], 17); }
   }
   function pause(){ paused=true; setStatus('pauza','var(--warn)'); }
-  function stop(){ paused=false; tracking=false; setStatus('zastaveno','var(--warn)'); finalizeSegment(); if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
-    // po stopu zase obnov preview, ať dál vidíš polohu
-    startPreviewWatch(); }
+  function stop(){
+    paused=false; tracking=false; setStatus('zastaveno','var(--warn)');
+    finalizeSegment();
+    if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+    startPreviewWatch();
+  }
 
-  // helper: Haversine (m) — pozor na pořadí lon/lat
+  // Haversine (m)
   function haversine(lon1, lat1, lon2, lat2){
-    const toRad = d => d*Math.PI/180; const R=6371000; const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1); const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(a)); }
+    const toRad = d => d*Math.PI/180; const R=6371000; const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(a));
+  }
 
-  // jednorázová ikona do poslední známé pozice
+  // jednorázová ikona
   function addSinglePoint(key){
     if(!lastFix){ alert('Ještě nemám polohu. Dej Start a počkej na fix.'); return; }
     const p={ pointIcon:key, createdAt:new Date().toISOString(), type:'Point' };
@@ -265,7 +302,9 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
   // Export
   function doExport(){
     if(currentSegment && currentSegment.coords.length>1){ finalizeSegment(); }
-    const pack={ type:'FeatureCollection', features: features.concat(collectDrawnSegments()), meta:{ surfaces:SURFACES, qualities:QUALITIES, pointIcons: POINT_ICONS.map(x=>({key:x.key,label:x.label})) } };
+    const pack={ type:'FeatureCollection', features: features.concat(collectDrawnSegments()), meta:{
+      surfaces:SURFACES, qualities:QUALITIES, pointIcons: POINT_ICONS.map(x=>({key:x.key,label:x.label}))
+    } };
     const blob=new Blob([JSON.stringify(pack,null,2)],{type:'application/geo+json'});
     const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='esk8-track.geojson'; a.click(); URL.revokeObjectURL(url);
   }
@@ -273,7 +312,7 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
     const arr=[]; linesLayer.eachLayer(l=>{ if(l.feature) arr.push(l.feature); }); pointsLayer.eachLayer(m=>{ if(m.feature) arr.push(m.feature); }); return arr;
   }
 
-  // === SMAZÁNÍ AKTUÁLNÍHO ZÁZNAMU ===
+  // Smazat
   function deleteCurrentRecord(){
     const ok = confirm('Opravdu smazat aktuální záznam? Tato akce je nevratná.');
     if(!ok) return;
@@ -282,24 +321,24 @@ button.danger{background:var(--err);border-color:var(--err);color:#fff}
     features.length = 0; setStatus('záznam smazán','var(--err)');
   }
 
-  // UI handlers
+  // Handlery
   document.getElementById('btnStart').addEventListener('click', ()=>{ if(!('geolocation' in navigator)){ alert('Prohlížeč nepodporuje geolokaci.'); return; } start(); });
   document.getElementById('btnPause').addEventListener('click', ()=> pause());
   document.getElementById('btnStop').addEventListener('click', ()=> stop());
   document.getElementById('btnExport').addEventListener('click', ()=> doExport());
   document.getElementById('btnDelete').addEventListener('click', ()=> deleteCurrentRecord());
 
-  // init: spustíme PREVIEW, ať je poloha vidět hned po načtení
-  if(navigator.geolocation){ startPreviewWatch(); }
-  else { map.setView([50.0755,14.4378], 13); }
+  // init
+  if(navigator.geolocation){ startPreviewWatch(); } else { map.setView([50.0755,14.4378], 13); }
 
-  // aktualizace legendy
+  // legenda
   function renderLegend(){
     const el=document.getElementById('legend');
-    el.innerHTML = `Povrch: <b>${selSurface.name}</b> • Kvalita: <span style=\"color:${colorForQuality(selQuality.name)}\"><b>${selQuality.name}</b></span>`;
+    el.innerHTML = `Povrch: <b>${selSurface.name}</b> • Kvalita: <span style="color:${colorForQuality(selQuality.name)}"><b>${selQuality.name}</b></span>`;
   }
   renderLegend();
   rowSurfaces.addEventListener('click', renderLegend, true);
   rowQualities.addEventListener('click', renderLegend, true);
-  </script></body>
+  </script>
+</body>
 </html>
