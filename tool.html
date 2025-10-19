@@ -9,16 +9,15 @@
     :root{
       --bg:#0b1220; --card:#0f172a; --muted:#9ca3af; --txt:#e5e7eb;
       --border:#1f2937; --acc:#22c55e; --warn:#f59e0b; --err:#ef4444; --blue:#3b82f6;
-      --footer-h: 160px; /* fallback; JS ji po načtení přepočítá */
+      --footer-h: 160px; /* fallback – JS ji po načtení přepočítá */
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
 
-    /* mapový kontejner níž ve „stacku“, ať nikdy nepřekryje footer */
-    #map { height:50vh; position:relative; z-index:0; }
+    /* obal má spodní padding = výška footeru, aby nic nepřekrýval */
+    .wrap{display:flex;flex-direction:column;min-height:100vh;padding-bottom:var(--footer-h)}
 
-    .wrap{display:flex;flex-direction:column;min-height:100vh;padding-bottom:var(--footer-h)} /* místo pro fixed footer */
     header{padding:10px 12px;border-bottom:1px solid var(--border);background:#0f172a;display:flex;justify-content:space-between;align-items:center;gap:10px}
     h1{margin:0;font-size:16px}
     .status{font-size:12px;padding:4px 8px;border-radius:999px;background:#111827;border:1px solid var(--border)}
@@ -30,14 +29,16 @@
     .sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
     .iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
 
-    /* FIXED footer – vysoko nad mapou a s pointer-events */
+    /* mapa je pod footrem (z-index:0) */
+    #map{height:50vh; position:relative; z-index:0;}
+
+    /* FIXED footer – vždy nad mapou */
     .footer{
       position: fixed; left: 0; right: 0; bottom: 0;
-      z-index: 10000; /* vyšší než cokoliv v Leafletu */
+      z-index: 10000;
       background: rgba(17,24,39,.95);
       backdrop-filter: blur(6px);
       border-top: 1px solid var(--border);
-      pointer-events: auto;
       padding-bottom: env(safe-area-inset-bottom, 0px);
     }
     .btnwrap{padding:10px 12px}
@@ -58,9 +59,8 @@
     .uploadbtn:hover{ filter:brightness(1.05) }
     .uploadhint{color:var(--muted); font-size:12px; margin-top:6px}
 
-    /* Rezerva pro mapové ovladače – silnější selektor + !important */
+    /* Rezerva pro mapové ovladače – silný selektor + !important */
     #map .leaflet-bottom{ bottom: calc(var(--footer-h) + 6px) !important; }
-    /* jistota: mapové kontejnery pod footrem */
     .leaflet-container, .leaflet-control-container { z-index: 1; }
   </style>
 </head>
@@ -105,7 +105,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-  /* --- dynamický výpočet výšky footeru, aby se mapa neposouvala přes tlačítka --- */
+  /* Dynamická rezerva podle skutečné výšky footeru */
   function refreshFooterReserve(){
     const f = document.getElementById('footer');
     if(!f) return;
@@ -350,4 +350,9 @@
     const ok = confirm('Opravdu smazat aktuální záznam? Tato akce je nevratná.');
     if(!ok) return;
     if(currentSegment){ try{ linesLayer.removeLayer(currentSegment.layer); }catch{} currentSegment = null; }
-    linesLayer.clearLayers(); pointsLayer.clearLayers(); iconsLayer
+    linesLayer.clearLayers(); pointsLayer.clearLayers(); iconsLayer.clearLayers();
+    features.length = 0; setStatus('záznam smazán','var(--err)');
+  }
+
+  // UI handlers
+  document.getElementById('btnStart').addEventListene
