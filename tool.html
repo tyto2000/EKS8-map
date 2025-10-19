@@ -9,10 +9,12 @@
     :root{
       --bg:#0b1220; --card:#0f172a; --muted:#9ca3af; --txt:#e5e7eb;
       --border:#1f2937; --acc:#22c55e; --warn:#f59e0b; --err:#ef4444; --blue:#3b82f6;
+      --footer-h: 148px; /* výška fixačního footeru (tlačítka + upload) */
     }
     *{box-sizing:border-box}
+    html,body{height:100%}
     body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
-    .wrap{display:flex;flex-direction:column;min-height:100vh}
+    .wrap{display:flex;flex-direction:column;min-height:100vh;padding-bottom:var(--footer-h)} /* místo pro fixed footer */
     header{padding:10px 12px;border-bottom:1px solid var(--border);background:#0f172a;display:flex;justify-content:space-between;align-items:center;gap:10px}
     h1{margin:0;font-size:16px}
     .status{font-size:12px;padding:4px 8px;border-radius:999px;background:#111827;border:1px solid var(--border)}
@@ -26,7 +28,14 @@
 
     #map{height:50vh}
 
-    .footer{position:sticky;bottom:0;background:rgba(17,24,39,.9);backdrop-filter:blur(6px);border-top:1px solid var(--border)}
+    /* FIXED footer – nad mapou, kliknutelný */
+    .footer{
+      position: fixed; left: 0; right: 0; bottom: 0;
+      z-index: 2000;
+      background: rgba(17,24,39,.95);
+      backdrop-filter: blur(6px);
+      border-top: 1px solid var(--border);
+    }
     .btnwrap{padding:10px 12px}
     .btnbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
     button{padding:12px;border-radius:12px;border:1px solid var(--border);background:#111827;color:var(--txt);font:inherit;cursor:pointer}
@@ -44,6 +53,12 @@
     }
     .uploadbtn:hover{ filter:brightness(1.05) }
     .uploadhint{color:var(--muted); font-size:12px; margin-top:6px}
+
+    /* Rezerva pro mapové ovladače (zoom / attribution), aby nebyly pod footrem) */
+    .leaflet-bottom{ bottom: calc(var(--footer-h) + 6px); }
+
+    /* iOS safe area */
+    .footer { padding-bottom: env(safe-area-inset-bottom, 0px); }
   </style>
 </head>
 <body>
@@ -63,7 +78,7 @@
     <!-- mapa (dolní půlka) -->
     <div id="map"></div>
 
-    <!-- tlačítka + upload -->
+    <!-- tlačítka + upload (FIXED footer) -->
     <footer class="footer">
       <div class="btnwrap">
         <div class="btnbar">
@@ -206,8 +221,9 @@
     if(typeof lat!=='number' || typeof lon!=='number') return;
     const ll=[lat,lon];
     if(!liveMarker){
-      liveMarker = L.circleMarker(ll, { radius:6, color: getComputedStyle(document.documentElement).getPropertyValue('--blue').trim() || '#3b82f6', fill:true, fillOpacity:1, weight:2 });
-      liveAccuracy = L.circle(ll, { radius: Math.max(5, acc||10), color: '#3b82f6', weight:1, fillOpacity:.08 });
+      const blue = getComputedStyle(document.documentElement).getPropertyValue('--blue').trim() || '#3b82f6';
+      liveMarker = L.circleMarker(ll, { radius:6, color: blue, fill:true, fillOpacity:1, weight:2 });
+      liveAccuracy = L.circle(ll, { radius: Math.max(5, acc||10), color: blue, weight:1, fillOpacity:.08 });
       liveMarker.addTo(liveLayer); liveAccuracy.addTo(liveLayer);
     } else {
       liveMarker.setLatLng(ll);
