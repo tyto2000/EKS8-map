@@ -1,8 +1,9 @@
-<!DOCTYPE html><html lang="cs">
+<!DOCTYPE html>
+<html lang="cs">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mapa povrchů – viewer + záložka Tool</title>
+  <title>Mapa povrchů – viewer + Tool</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     :root{
@@ -12,17 +13,20 @@
     html, body { height:100%; margin:0; background:var(--bg); color:var(--txt); font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif }
     #app{display:flex; flex-direction:column; height:100%}
 
-    /* Top tabs */
+    /* Tabs */
     .tabs{display:flex; gap:8px; padding:8px; background:var(--panel); border-bottom:1px solid var(--border); align-items:center}
     .tab{appearance:none; border:1px solid var(--border); background:var(--tab); color:var(--txt); padding:8px 12px; border-radius:10px; cursor:pointer; font:inherit}
     .tab.active{background:var(--tab-act); box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
     .tabs .spacer{flex:1}
 
-    /* Viewer area */
+    /* MAP */
     #viewerWrap{position:relative; display:flex; flex-direction:column; height:100%;}
     #map{flex:1;}
+    #banner { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#111827; color:#e5e7eb; padding:8px 12px; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.35); font-size:14px; z-index:1000 }
+    #banner.error{ background:#7f1d1d }
+    #banner small{ color:#9ca3af }
 
-    /* Bottom legend (only in MAP tab) */
+    /* Legend */
     #legend { position: fixed; left:0; right:0; bottom:0; background: rgba(255,255,255,.96); color:#111827;
       border-top:1px solid #e5e7eb; padding:8px 10px; z-index: 1001; display:flex; align-items:center; gap:10px; backdrop-filter: saturate(120%) blur(4px); }
     #legend .title { font-size: 13px; font-weight:600; white-space:nowrap }
@@ -35,34 +39,11 @@
     .leaflet-bottom{ bottom:56px }
     @media (max-width:520px){ #legend{padding:6px 8px} .leaflet-bottom{bottom:50px} }
 
-    /* Banner */
-    #banner { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#111827; color:#e5e7eb; padding:8px 12px; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.35); font-size:14px; z-index:1000 }
-    #banner.error{ background:#7f1d1d }
-    #banner small{ color:#9ca3af }
-
-    /* TOOL tab (iframe) */
-    #toolWrap{display:none; height:100%;}
+    /* TOOL tab */
+    #toolWrap{display:none; height:100%; flex-direction:column}
     #toolFrame{border:0; width:100%; height:100%}
     .toolNote{padding:10px; background:var(--panel); border-top:1px solid var(--border); color:var(--muted); font-size:13px}
-
-    /* --- Modal (intro k Toolu) --- */
-    .modal-backdrop{
-      position:fixed; inset:0; background:rgba(0,0,0,.5);
-      display:none; align-items:center; justify-content:center; z-index:2000;
-    }
-    .modal{
-      max-width:720px; width:92%; max-height:80vh; overflow:auto;
-      background:#0f172a; border:1px solid #1f2937; border-radius:14px;
-      box-shadow:0 20px 60px rgba(0,0,0,.6); padding:16px 16px 12px;
-    }
-    .modal h2{ margin:0 0 8px; font-size:18px }
-    .modal p{ margin:8px 0; line-height:1.5; color:#e5e7eb }
-    .modal .muted{ color:#9ca3af }
-    .modal .tips{ background:#0b1220; border:1px solid #1f2937; padding:10px 12px; border-radius:10px; margin-top:8px }
-    .modal .actions{ display:flex; gap:8px; justify-content:flex-end; padding-top:10px }
-    .btn{ padding:10px 14px; border-radius:10px; border:1px solid #1f2937; background:#111827; color:#e5e7eb; font:inherit; cursor:pointer }
-    .btn.primary{ background:#22c55e; border-color:#22c55e; color:#04230e; font-weight:600 }
-    .btn.ghost{ background:transparent }
+    .toolNote a{ color:#a7f3d0; text-decoration:none }
   </style>
 </head>
 <body>
@@ -74,7 +55,7 @@
       <div class="spacer"></div>
     </div>
 
-    <!-- Viewer (Map) -->
+    <!-- MAP -->
     <section id="viewerWrap">
       <div id="map"></div>
       <div id="banner">Načítám data… <small>(když to padne, zkontroluj API key / sdílení / odkaz)</small></div>
@@ -84,46 +65,23 @@
       </div>
     </section>
 
-    <!-- Tool (iframe, oddělené) -->
+    <!-- TOOL (oddělené) -->
     <section id="toolWrap">
-      <iframe id="toolFrame" src="./tool.html" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
-      <div class="toolNote">Tool je načten jako <b>oddělené iframe</b>. Data se <b>nesdílejí</b> s viewerem. Pokud se nenačte, ověř umístění <code>tool.html</code> v repu.</div>
+      <!-- allow-downloads + allow-popups kvůli Exportu v toolu -->
+      <iframe id="toolFrame"
+        src="./tool.html"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups">
+      </iframe>
+      <div class="toolNote">
+        Tool běží odděleně. Pokud by stahování nefungovalo, otevři ho mimo iframe:
+        <a href="./tool.html" target="_blank" rel="noopener">Otevřít Tool v nové záložce</a>.
+      </div>
     </section>
-  </div>
-
-  <!-- Modal: intro k Toolu -->
-  <div class="modal-backdrop" id="toolModalBackdrop" role="dialog" aria-modal="true" aria-labelledby="toolModalTitle">
-    <div class="modal">
-      <h2 id="toolModalTitle">👋 Vítej v ESK8 Map Toolu!</h2>
-      <p>Díky, že pomáháš rozšiřovat komunitní mapu povrchů pro jakoukoliv mikromobilitu (ESK8, EUC, OW, ale i kola). Každý kousek trasy, který nahraješ, pomůže ostatním jezdcům plánovat lepší a bezpečnější jízdy. 💚</p>
-
-      <p class="muted"><b>🧭 Jak na to:</b></p>
-      <p>1) <b>Povol přístup k poloze</b> – modrý bod ukáže, že jsi online.</p>
-      <p>2) Vyber <b>povrch</b> a <b>kvalitu</b>. Když se v průběhu záznamu změní, prostě klikni na nové tlačítko a Tool to uloží do záznamu.</p>
-      <p>3) Stiskni <b>Start</b> a projížděj trasu – záznam se ukládá automaticky. Neboj, nikdo nevidí tvoji polohu, dokud nepošleš stažený soubor.</p>
-      <p>4) Potřebuješ pauzu? Klikni <b>Pauza</b>, pak můžeš znovu <b>Start</b>.</p>
-      <p>5) Pomocí ikon přidej <b>jednorázové body</b> (např. závora, přejezd).</p>
-      <p>6) Po dokončení klikni <b>Export</b> – uloží se soubor <code>.geojson</code>, který můžeš poslat přes krátký formulář pod tlačítky ve spodní části stránky.</p>
-
-      <div class="tips">
-        <p><b>💡 Tipy:</b></p>
-        <p>• Modrý kruh ukazuje přesnost GPS.<br/>
-           • Tlačítkem <b>Smazat</b> vymažeš aktuální záznam a můžeš začít znovu.<br/>
-           • Nezavírej stránku během záznamu – GPS funguje jen když je aktivní.</p>
-      </div>
-
-      <p><b>Děkujeme, že přispíváš!</b> Každý metr se počítá — společně tvoříme mapu, která pomůže celé komunitě.</p>
-
-      <div class="actions">
-        <button class="btn ghost" id="toolCancel">Zpět</button>
-        <button class="btn primary" id="toolGo">Pokračovat do Toolu</button>
-      </div>
-    </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // === Přepínání záložek ===
+    // === Tabs ===
     const tabMap   = document.getElementById('tabMap');
     const tabTool  = document.getElementById('tabTool');
     const viewerWrap = document.getElementById('viewerWrap');
@@ -136,33 +94,15 @@
         setTimeout(updateAllIcons, 0);
       } else {
         tabTool.classList.add('active'); tabMap.classList.remove('active');
-        viewerWrap.style.display = 'none'; toolWrap.style.display = 'block';
+        viewerWrap.style.display = 'none'; toolWrap.style.display = 'flex';
       }
     }
     tabMap.addEventListener('click', ()=>activate('map'));
+    tabTool.addEventListener('click', ()=>activate('tool'));
 
-    // --- Modal kontrola před vstupem do Toolu ---
-    const modal   = document.getElementById('toolModalBackdrop');
-    const btnGo   = document.getElementById('toolGo');
-    const btnBack = document.getElementById('toolCancel');
-
-    function openModal(){ modal.style.display = 'flex'; }
-    function closeModal(){ modal.style.display = 'none'; }
-
-    tabTool.addEventListener('click', (e)=>{
-      e.preventDefault();
-      // zobraz úvodní modal místo okamžitého přepnutí
-      openModal();
-    });
-    btnBack.addEventListener('click', closeModal);
-    btnGo.addEventListener('click', ()=>{
-      closeModal();
-      activate('tool');
-    });
-
-    // === Viewer (původní kód) ===
-    const DRIVE_FILE_ID  = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb"; // tvoje ID
-    const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ";         // tvůj API key
+    // === Viewer (mapa) ===
+    const DRIVE_FILE_ID  = "1rXCuZ260GR1ipC3-LE62WRM5I_xMN1gb";
+    const GOOGLE_API_KEY = "AIzaSyA6lpPAI9V3HDjEY6jYf_7CnFpg2nvl8VQ";
     const DRIVE_DATA_URL = `https://www.googleapis.com/drive/v3/files/${DRIVE_FILE_ID}?alt=media&key=${GOOGLE_API_KEY}`;
     const LOCAL_DATA_URL = "./data.geojson";
     const urlParams = new URLSearchParams(location.search);
@@ -177,14 +117,14 @@
     const lineLayers = [];
 
     const ICON_SVGS = {
-      dot:   '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
+      dot:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
       square:'<svg width="16" height="16" viewBox="0 0 16 16"><rect x="4.2" y="4.2" width="7.6" height="7.6" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
       diamond:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2 L14 8 L8 14 L2 8 Z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
       triangle:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 3 L13 13 H3 Z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
-      star:  '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2 L9.9 6.5 L15 6.5 L10.7 9.6 L12.5 14 L8 11.2 L3.5 14 L5.3 9.6 L1 6.5 L6.1 6.5 Z" fill="#fff" stroke="#111" stroke-width="1.1"/></svg>',
+      star:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2 L9.9 6.5 L15 6.5 L10.7 9.6 L12.5 14 L8 11.2 L3.5 14 L5.3 9.6 L1 6.5 L6.1 6.5 Z" fill="#fff" stroke="#111" stroke-width="1.1"/></svg>',
       stairs:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 12 H12 V10 H10 V8 H8 V6 H6 V4 H4 Z" fill="#fff" stroke="#111" stroke-width="1.1"/></svg>',
-      brick: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="8" fill="#fff" stroke="#111" stroke-width="1"/><path d="M2 8 H14 M6 4 V8 M10 8 V12" stroke="#111" stroke-width="1"/></svg>',
-      plank: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 5 H14 M2 8 H14 M2 11 H14" stroke="#111" stroke-width="1.6"/></svg>',
+      brick:'<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="8" fill="#fff" stroke="#111" stroke-width="1"/><path d="M2 8 H14 M6 4 V8 M10 8 V12" stroke="#111" stroke-width="1"/></svg>',
+      plank:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 5 H14 M2 8 H14 M2 11 H14" stroke="#111" stroke-width="1.6"/></svg>',
       pebble:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="8" r="2.4" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="6" r="1.9" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="11" r="1.5" fill="#fff" stroke="#111" stroke-width="1"/></svg>'
     };
     const POINT_COLOR = "#ef4444";
