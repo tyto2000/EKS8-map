@@ -16,7 +16,6 @@
     h1{margin:0;font-size:16px}
     .status{font-size:12px;padding:4px 8px;border-radius:999px;background:#111827;border:1px solid var(--border)}
 
-    /* výběry */
     .controls{padding:10px 12px;display:grid;gap:8px;background:var(--panel);border-bottom:1px solid var(--border)}
     .row{display:flex;gap:8px;flex-wrap:wrap}
     .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#0b1020;font-size:13px;cursor:pointer;user-select:none}
@@ -24,7 +23,6 @@
     .sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
     .iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
 
-    /* akce nad mapou */
     .actions{padding:10px 12px;background:rgba(17,24,39,.9);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
     .btnbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
     button{padding:12px;border-radius:12px;border:1px solid var(--border);background:#111827;color:var(--txt);font:inherit;cursor:pointer}
@@ -33,8 +31,15 @@
     button.danger{background:var(--err);border-color:var(--err);color:#fff}
     .legend{padding:8px 0;color:var(--muted);font-size:12px;border-top:1px dashed #243349;margin-top:8px}
 
-    /* mapa zabere zbytek výšky */
     #map{flex:1;min-height:40vh}
+
+    /* Vlastní potvrzovací dialog (funguje i v sandboxu) */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9999}
+    .modal{background:#0f172a;border:1px solid var(--border);border-radius:14px;padding:16px;max-width:320px;width:92%}
+    .modal h3{margin:0 0 8px;font-size:16px}
+    .modal p{margin:0 0 14px;color:var(--muted);font-size:14px}
+    .modal .actions{display:flex;gap:8px;background:transparent;border:0;padding:0}
+    .modal .actions button{flex:1}
   </style>
 </head>
 <body>
@@ -63,8 +68,19 @@
       <div class="legend" id="legend"></div>
     </section>
 
-    <!-- mapa -->
     <div id="map"></div>
+  </div>
+
+  <!-- Vlastní modal pro smazání -->
+  <div class="modal-backdrop" id="delModal">
+    <div class="modal">
+      <h3>Smazat aktuální záznam?</h3>
+      <p>Tato akce je nevratná.</p>
+      <div class="actions">
+        <button id="delCancel">Zrušit</button>
+        <button id="delConfirm" class="danger">Smazat</button>
+      </div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -158,7 +174,6 @@
     return L.divIcon({ html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2] });
   }
   function lineStyle(p){ return { color: colorForQuality(p.quality), weight: 6, opacity:0.95 } }
-
   function lineIcon(key){ const html=ICON_SVGS[key]||ICON_SVGS.dot; return L.divIcon({ html, className:'', iconSize:[16,16], iconAnchor:[8,8] }); }
   function placeIconsForLine(layer){
     if(layer._iconMarkers){ layer._iconMarkers.forEach(m=>iconsLayer.removeLayer(m)); layer._iconMarkers=null; }
@@ -249,7 +264,7 @@
     if(previewWatchId!=null) return;
     previewWatchId = navigator.geolocation.watchPosition((pos)=>{
       const c={ lat:pos.coords.latitude, lon:pos.coords.longitude, acc:pos.coords.accuracy };
-      lastFix=c; updateLiveMarker(c.lat, c.lon, c.acc);
+      lastFix=c; updateLiveMarker(c.lat,c.lon,c.acc);
       if(!map._centered){ map.setView([c.lat,c.lon], 16); map._centered=true; }
     }, (e)=>{ console.warn('preview geo err', e); }, { enableHighAccuracy:true, maximumAge:2000, timeout:10000 });
   }
@@ -284,49 +299,62 @@
     const m=L.marker([lastFix.lat,lastFix.lon], { icon: pointDivIcon(p) }).addTo(pointsLayer); m.feature=feat; features.push(feat);
   }
 
-  // Export
-  function doExport(){
+  // ====== EXPORT: share → download → otevřít
+  async function doExport(){
     if(currentSegment && currentSegment.coords.length>1){ finalizeSegment(); }
     const pack={ type:'FeatureCollection', features: features.concat(collectDrawnSegments()), meta:{
       surfaces:SURFACES, qualities:QUALITIES, pointIcons: POINT_ICONS.map(x=>({key:x.key,label:x.label}))
     } };
-    const blob=new Blob([JSON.stringify(pack,null,2)],{type:'application/geo+json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a'); a.href=url; a.download='esk8-track.geojson';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  }
-  function collectDrawnSegments(){
-    const arr=[]; linesLayer.eachLayer(l=>{ if(l.feature) arr.push(l.feature); }); pointsLayer.eachLayer(m=>{ if(m.feature) arr.push(m.feature); }); return arr;
+    const json = JSON.stringify(pack, null, 2);
+    const blob = new Blob([json], {type:'application/geo+json'});
+    const file = new File([blob], 'esk8-track.geojson', {type:'application/geo+json'});
+
+    // 1) Web Share API s files (nejlepší pro mobily)
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files:[file], title:'ESK8 track', text:'GeoJSON záznam trasy' });
+        setStatus('exportováno přes Sdílet','var(--acc)'); 
+        return;
+      } catch(e){ /* pokračuj na fallback */ }
+    }
+
+    // 2) Klasický download
+    try{
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'esk8-track.geojson';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 1500);
+      setStatus('soubor stažen','var(--acc)');
+      return;
+    }catch(e){ /* pokračuj na 3) */ }
+
+    // 3) Nouzově: otevřít obsah v této stránce / nové (někdy v sandboxu jediné funkční)
+    const url = URL.createObjectURL(blob);
+    location.href = url; // zobrazí obsah, uživatel může sdílet/uložit ze zobrazení
   }
 
-  // Smazat
-  function deleteCurrentRecord(){
-    const ok = confirm('Opravdu smazat aktuální záznam? Tato akce je nevratná.');
-    if(!ok) return;
+  function collectDrawnSegments(){
+    const arr=[]; linesLayer.eachLayer(l=>{ if(l.feature) arr.push(l.feature); });
+    pointsLayer.eachLayer(m=>{ if(m.feature) arr.push(m.feature); });
+    return arr;
+  }
+
+  // ====== SMAZÁNÍ: vlastní modal ======
+  const delModal = document.getElementById('delModal');
+  const delCancel = document.getElementById('delCancel');
+  const delConfirm = document.getElementById('delConfirm');
+
+  function openDeleteModal(){ delModal.style.display='flex'; }
+  function closeDeleteModal(){ delModal.style.display='none'; }
+
+  function reallyDelete(){
     if(currentSegment){ try{ linesLayer.removeLayer(currentSegment.layer); }catch{} currentSegment = null; }
     linesLayer.clearLayers(); pointsLayer.clearLayers(); iconsLayer.clearLayers();
     features.length = 0; setStatus('záznam smazán','var(--err)');
+    closeDeleteModal();
   }
 
   // Handlery
   document.getElementById('btnStart').addEventListener('click', ()=>{ if(!('geolocation' in navigator)){ alert('Prohlížeč nepodporuje geolokaci.'); return; } start(); });
-  document.getElementById('btnPause').addEventListener('click', ()=> pause());
-  document.getElementById('btnStop').addEventListener('click', ()=> stop());
-  document.getElementById('btnExport').addEventListener('click', ()=> doExport());
-  document.getElementById('btnDelete').addEventListener('click', ()=> deleteCurrentRecord());
-
-  // init
-  if(navigator.geolocation){ startPreviewWatch(); } else { map.setView([50.0755,14.4378], 13); }
-
-  // legenda
-  function renderLegend(){
-    const el=document.getElementById('legend');
-    el.innerHTML = `Povrch: <b>${selSurface.name}</b> • Kvalita: <span style="color:${colorForQuality(selQuality.name)}"><b>${selQuality.name}</b></span>`;
-  }
-  renderLegend();
-  rowSurfaces.addEventListener('click', renderLegend, true);
-  rowQualities.addEventListener('click', renderLegend, true);
-  </script>
-</body>
-</html>
+  document.getElementById('btnPause').addEventListener('click', ()
