@@ -24,7 +24,7 @@
     .sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
     .iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
 
-    /* ovladače nad mapou */
+    /* akce nad mapou */
     .actions{padding:10px 12px;background:rgba(17,24,39,.9);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
     .btnbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
     button{padding:12px;border-radius:12px;border:1px solid var(--border);background:#111827;color:var(--txt);font:inherit;cursor:pointer}
@@ -33,281 +33,300 @@
     button.danger{background:var(--err);border-color:var(--err);color:#fff}
     .legend{padding:8px 0;color:var(--muted);font-size:12px;border-top:1px dashed #243349;margin-top:8px}
 
-    /* tlačítko na Form – mezi ovládáním a mapou */
-    .uploadbar{padding:12px;background:#0f172a;border-bottom:1px solid var(--border);text-align:center}
-    .uploadbtn{display:inline-block;padding:12px 18px;background:var(--acc);color:#04230e;font-weight:700;border-radius:12px;text-decoration:none;border:1px solid var(--acc)}
-    .uploadbtn:hover{filter:brightness(1.05)}
-    .uploadhint{color:var(--muted);font-size:12px;margin-top:6px}
-
     /* mapa zabere zbytek výšky */
-    #map{flex:1;min-height:50vh}
-
-    /* chybový banner */
-    #errbar{display:none;position:fixed;left:50%;transform:translateX(-50%);top:10px;background:#7f1d1d;color:#fff;padding:8px 12px;border-radius:10px;z-index:99999}
+    #map{flex:1;min-height:40vh}
   </style>
 </head>
 <body>
-<div id="errbar"></div>
+  <div class="wrap">
+    <header>
+      <h1>ESK8 GPS logger</h1>
+      <span id="status" class="status">připraveno</span>
+    </header>
 
-<div class="wrap">
-  <header>
-    <h1>ESK8 GPS logger</h1>
-    <span id="status" class="status">připraveno</span>
-  </header>
+    <!-- 3 řádky voleb -->
+    <section class="controls">
+      <div class="row" id="rowSurfaces"></div>
+      <div class="row" id="rowQualities"></div>
+      <div class="row" id="rowIcons"></div>
+    </section>
 
-  <!-- 3 řádky voleb -->
-  <section class="controls">
-    <div class="row" id="rowSurfaces"></div>
-    <div class="row" id="rowQualities"></div>
-    <div class="row" id="rowIcons"></div>
-  </section>
+    <!-- akční tlačítka (NAD mapou) -->
+    <section class="actions">
+      <div class="btnbar">
+        <button id="btnStart" class="primary" type="button">Start</button>
+        <button id="btnPause" class="warn" type="button">Pauza</button>
+        <button id="btnStop" class="danger" type="button">Stop</button>
+        <button id="btnExport" type="button">Export</button>
+        <button id="btnDelete" class="danger" type="button">Smazat</button>
+      </div>
+      <div class="legend" id="legend"></div>
+    </section>
 
-  <!-- akční tlačítka (NAD mapou) -->
-  <section class="actions">
-    <div class="btnbar">
-      <button id="btnStart" class="primary" type="button">Start</button>
-      <button id="btnPause" class="warn" type="button">Pauza</button>
-      <button id="btnStop" class="danger" type="button">Stop</button>
-      <button id="btnExport" type="button">Export</button>
-      <button id="btnDelete" class="danger" type="button">Smazat</button>
-    </div>
-    <div class="legend" id="legend"></div>
-  </section>
-
-  <!-- odkaz na Google Form (MEZI tlačítky a mapou). Otevírá se do stejného okna, funguje i v sandboxu -->
-  <div class="uploadbar">
-    <a class="uploadbtn" id="formLink"
-       href="https://forms.gle/2VNdXTozK66ZQKUNA">
-      📤 Zde nahraj geojson soubor, abysme ho zadali do mapy, díky 💚
-    </a>
-    <div class="uploadhint">Pokud chceš otevřít ve <b>nové záložce</b>, povol v indexu u iframu <code>allow-popups</code> a přidej <code>target="_blank"</code>.</div>
+    <!-- mapa -->
+    <div id="map"></div>
   </div>
 
-  <!-- mapa -->
-  <div id="map"></div>
-</div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+  // ====== Datové slovníky ======
+  const ICON_SVGS = {
+    dot:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
+    brick:'<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="8" fill="#fff" stroke="#111" stroke-width="1"/><path d="M2 8 H14 M6 4 V8 M10 8 V12" stroke="#111" stroke-width="1"/></svg>',
+    pebble:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="8" r="2.4" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="6" r="1.9" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="11" r="1.5" fill="#fff" stroke="#111" stroke-width="1"/></svg>',
+    stairs:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 12 H12 V10 H10 V8 H8 V6 H6 V4 H4 Z" fill="#fff" stroke="#111" stroke-width="1.1"/></svg>',
+    plank:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 5 H14 M2 8 H14 M2 11 H14" stroke="#111" stroke-width="1.6"/></svg>',
+    triangle:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 3 L13 13 H3 Z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>'
+  };
+  const SURFACES = [
+    {name:'asfalt', icon:'dot', repeat:28},
+    {name:'dlažba / kostky', icon:'brick', repeat:28},
+    {name:'štěrk / prach', icon:'pebble', repeat:28},
+    {name:'schody', icon:'stairs', repeat:32},
+    {name:'dřevo / lávka', icon:'plank', repeat:32},
+    {name:'hlína', icon:'triangle', repeat:30}
+  ];
+  const QUALITIES = [
+    {name:'hladký', color:'#22c55e'},
+    {name:'ok', color:'#f59e0b'},
+    {name:'výtluky', color:'#ef4444'},
+    {name:'nebezpečí', color:'#111827'}
+  ];
+  const POINT_ICONS = [
+    { key:'warning', label:'pozor', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 3L2.5 20h19L12 3z" fill="white" stroke="currentColor" stroke-width="2"/><path d="M12 8v6M12 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' },
+    { key:'speed_bump', label:'retardér', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="9" fill="white" stroke="currentColor" stroke-width="2"/><path d="M6 14c2-3 10-3 12 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="14" x2="19" y2="14" stroke="currentColor" stroke-width="2"/></svg>'},
+    { key:'zavora', label:'závora', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><rect x="4" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="17" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="5" y="9" width="14" height="4" rx="1" fill="white" stroke="currentColor" stroke-width="2"/><path d="M6 9.5 L9 12.5 M9 9.5 L12 12.5 M12 9.5 L15 12.5 M15 9.5 L18 12.5" stroke="currentColor" stroke-width="2"/></svg>' },
+    { key:'railcross', label:'přejezd', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 5 L19 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M5 5 L19 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' },
+    { key:'pin', label:'bod', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 22s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z" fill="white" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></svg>' }
+  ];
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-(function(){
-  // ——— chybový banner
-  function err(msg){ const b=document.getElementById('errbar'); b.textContent=msg; b.style.display='block'; setTimeout(()=>b.style.display='none', 4000); }
+  // ====== UI render ======
+  const rowSurfaces = document.getElementById('rowSurfaces');
+  const rowQualities = document.getElementById('rowQualities');
+  const rowIcons = document.getElementById('rowIcons');
+  const statusEl = document.getElementById('status');
 
-  document.addEventListener('DOMContentLoaded', () => {
-    try{
-      // ====== Datové sady ======
-      const ICON_SVGS = {
-        dot:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
-        brick:'<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="8" fill="#fff" stroke="#111" stroke-width="1"/><path d="M2 8 H14 M6 4 V8 M10 8 V12" stroke="#111" stroke-width="1"/></svg>',
-        pebble:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="8" r="2.4" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="6" r="1.9" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="11" r="1.5" fill="#fff" stroke="#111" stroke-width="1"/></svg>',
-        stairs:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 12 H12 V10 H10 V8 H8 V6 H6 V4 H4 Z" fill="#fff" stroke="#111" stroke-width="1.1"/></svg>',
-        plank:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 5 H14 M2 8 H14 M2 11 H14" stroke="#111" stroke-width="1.6"/></svg>',
-        triangle:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 3 L13 13 H3 Z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>'
-      };
-      const SURFACES = [
-        {name:'asfalt', icon:'dot', repeat:28},
-        {name:'dlažba / kostky', icon:'brick', repeat:28},
-        {name:'štěrk / prach', icon:'pebble', repeat:28},
-        {name:'schody', icon:'stairs', repeat:32},
-        {name:'dřevo / lávka', icon:'plank', repeat:32},
-        {name:'hlína', icon:'triangle', repeat:30}
-      ];
-      const QUALITIES = [
-        {name:'hladký', color:'#22c55e'},
-        {name:'ok', color:'#f59e0b'},
-        {name:'výtluky', color:'#ef4444'},
-        {name:'nebezpečí', color:'#111827'}
-      ];
-      const POINT_ICONS = [
-        { key:'warning', label:'pozor', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 3L2.5 20h19L12 3z" fill="white" stroke="currentColor" stroke-width="2"/><path d="M12 8v6M12 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' },
-        { key:'speed_bump', label:'retardér', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="9" fill="white" stroke="currentColor" stroke-width="2"/><path d="M6 14c2-3 10-3 12 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="14" x2="19" y2="14" stroke="currentColor" stroke-width="2"/></svg>'},
-        { key:'zavora', label:'závora', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><rect x="4" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="17" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="5" y="9" width="14" height="4" rx="1" fill="white" stroke="currentColor" stroke-width="2"/><path d="M6 9.5 L9 12.5 M9 9.5 L12 12.5 M12 9.5 L15 12.5 M15 9.5 L18 12.5" stroke="currentColor" stroke-width="2"/></svg>' },
-        { key:'railcross', label:'přejezd', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 5 L19 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M5 5 L19 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' },
-        { key:'pin', label:'bod', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 22s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z" fill="white" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></svg>' }
-      ];
+  let selSurface = SURFACES[0];
+  let selQuality = QUALITIES[0];
 
-      // ====== UI render ======
-      const rowSurfaces = document.getElementById('rowSurfaces');
-      const rowQualities = document.getElementById('rowQualities');
-      const rowIcons = document.getElementById('rowIcons');
-      const statusEl = document.getElementById('status');
+  function renderSurfaces(){
+    rowSurfaces.innerHTML='';
+    SURFACES.forEach((s)=>{
+      const chip=document.createElement('div'); chip.className='chip'+(s===selSurface?' active':'');
+      const icon=document.createElement('span'); icon.className='iconbox'; icon.innerHTML=ICON_SVGS[s.icon]||ICON_SVGS.dot; chip.appendChild(icon);
+      chip.appendChild(Object.assign(document.createElement('span'),{textContent:s.name}));
+      chip.addEventListener('click', ()=>{ selSurface=s; renderSurfaces(); if(tracking) startNewSegment('surface-change'); renderLegend(); });
+      rowSurfaces.appendChild(chip);
+    });
+  }
+  function renderQualities(){
+    rowQualities.innerHTML='';
+    QUALITIES.forEach(q=>{
+      const chip=document.createElement('div'); chip.className='chip'+(q===selQuality?' active':'');
+      const sw=document.createElement('span'); sw.className='sw'; sw.style.background=q.color; chip.appendChild(sw);
+      chip.appendChild(Object.assign(document.createElement('span'),{textContent:q.name}));
+      chip.addEventListener('click', ()=>{ selQuality=q; renderQualities(); if(tracking) startNewSegment('quality-change'); renderLegend(); });
+      rowQualities.appendChild(chip);
+    });
+  }
+  function renderIcons(){
+    rowIcons.innerHTML='';
+    POINT_ICONS.forEach(pi=>{
+      const chip=document.createElement('div'); chip.className='chip';
+      const size=18; const html=`<div style="width:${size}px;height:${size}px;color:#ef4444">${pi.svg}</div>`;
+      const box=document.createElement('span'); box.className='iconbox'; box.innerHTML=html; chip.appendChild(box);
+      chip.appendChild(Object.assign(document.createElement('span'),{textContent:pi.label}));
+      chip.addEventListener('click', ()=> addSinglePoint(pi.key));
+      rowIcons.appendChild(chip);
+    });
+  }
+  renderSurfaces(); renderQualities(); renderIcons();
 
-      let selSurface = SURFACES[0];
-      let selQuality = QUALITIES[0];
+  // ====== Mapa ======
+  const map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20, attribution:'&copy; OpenStreetMap'}).addTo(map);
+  const linesLayer = L.featureGroup().addTo(map);
+  const pointsLayer = L.featureGroup().addTo(map);
+  const iconsLayer = L.featureGroup().addTo(map);
+  const liveLayer = L.layerGroup().addTo(map);
 
-      function colorForQuality(name){ const q=QUALITIES.find(x=>x.name===name); return q? q.color : '#38bdf8'; }
-      function renderLegend(){
-        document.getElementById('legend').innerHTML =
-          `Povrch: <b>${selSurface.name}</b> • Kvalita: <span style="color:${colorForQuality(selQuality.name)}"><b>${selQuality.name}</b></span>`;
-      }
+  function colorForQuality(name){ const q=QUALITIES.find(x=>x.name===name); return q? q.color : '#38bdf8'; }
+  function pointDivIcon(p){
+    const size=24; const color='#ef4444';
+    const meta = POINT_ICONS.find(x=>x.key===p.pointIcon) || POINT_ICONS[0];
+    const html = `<div style="width:${size}px;height:${size}px;color:${color}">${meta.svg}</div>`;
+    return L.divIcon({ html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2] });
+  }
+  function lineStyle(p){ return { color: colorForQuality(p.quality), weight: 6, opacity:0.95 } }
 
-      function renderSurfaces(){
-        rowSurfaces.innerHTML='';
-        SURFACES.forEach((s)=>{
-          const chip=document.createElement('div'); chip.className='chip'+(s===selSurface?' active':'');
-          const icon=document.createElement('span'); icon.className='iconbox'; icon.innerHTML=ICON_SVGS[s.icon]||ICON_SVGS.dot; chip.appendChild(icon);
-          chip.appendChild(Object.assign(document.createElement('span'),{textContent:s.name}));
-          chip.addEventListener('click', ()=>{ selSurface=s; renderSurfaces(); if(tracking) startNewSegment('surface-change'); renderLegend(); });
-          rowSurfaces.appendChild(chip);
-        });
-      }
-      function renderQualities(){
-        rowQualities.innerHTML='';
-        QUALITIES.forEach(q=>{
-          const chip=document.createElement('div'); chip.className='chip'+(q===selQuality?' active':'');
-          const sw=document.createElement('span'); sw.className='sw'; sw.style.background=q.color; chip.appendChild(sw);
-          chip.appendChild(Object.assign(document.createElement('span'),{textContent:q.name}));
-          chip.addEventListener('click', ()=>{ selQuality=q; renderQualities(); if(tracking) startNewSegment('quality-change'); renderLegend(); });
-          rowQualities.appendChild(chip);
-        });
-      }
-      function renderIcons(){
-        rowIcons.innerHTML='';
-        POINT_ICONS.forEach(pi=>{
-          const chip=document.createElement('div'); chip.className='chip';
-          const size=18; const html=`<div style="width:${size}px;height:${size}px;color:#ef4444">${pi.svg}</div>`;
-          const box=document.createElement('span'); box.className='iconbox'; box.innerHTML=html; chip.appendChild(box);
-          chip.appendChild(Object.assign(document.createElement('span'),{textContent:pi.label}));
-          chip.addEventListener('click', ()=> addSinglePoint(pi.key));
-          rowIcons.appendChild(chip);
-        });
-      }
-      renderSurfaces(); renderQualities(); renderIcons(); renderLegend();
+  function lineIcon(key){ const html=ICON_SVGS[key]||ICON_SVGS.dot; return L.divIcon({ html, className:'', iconSize:[16,16], iconAnchor:[8,8] }); }
+  function placeIconsForLine(layer){
+    if(layer._iconMarkers){ layer._iconMarkers.forEach(m=>iconsLayer.removeLayer(m)); layer._iconMarkers=null; }
+    const p=layer.feature.properties;
+    const latlngs = layer.getLatLngs(); if(!latlngs || latlngs.length<2) return;
+    const pts = latlngs.flat ? latlngs.flat() : latlngs;
+    const pix=pts.map(ll=>map.latLngToLayerPoint(ll));
+    let segLens=[]; let total=0;
+    for(let i=0;i<pix.length-1;i++){ const dx=pix[i+1].x-pix[i].x, dy=pix[i+1].y-pix[i].y; const Lseg=Math.hypot(dx,dy); segLens.push(Lseg); total+=Lseg; }
+    const markers=[]; const icon=lineIcon(p.surfaceIcon||selSurface.icon); const repeat = p.surfaceRepeat || selSurface.repeat || 28;
+    for(let d=0; d<=total; d+= repeat){
+      let acc=0, k=-1; for(let i=0;i<segLens.length;i++){ if(acc+segLens[i]>=d){k=i;break} acc+=segLens[i]; }
+      if(k<0) continue; const A=pix[k], B=pix[k+1]; const t=(d-acc)/(segLens[k]||1); const x=A.x+(B.x-A.x)*t, y=A.y+(B.y-A.y)*t; const ll=map.layerPointToLatLng(L.point(x,y));
+      const m=L.marker(ll, { icon, interactive:false, keyboard:false }); iconsLayer.addLayer(m); markers.push(m);
+    }
+    layer._iconMarkers=markers;
+  }
 
-      // ====== Mapa ======
-      const map = L.map('map');
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20, attribution:'&copy; OpenStreetMap'}).addTo(map);
-      const linesLayer = L.featureGroup().addTo(map);
-      const pointsLayer = L.featureGroup().addTo(map);
-      const iconsLayer = L.featureGroup().addTo(map);
-      const liveLayer = L.layerGroup().addTo(map);
+  // ====== Geologger + LIVE poloha ======
+  let tracking=false, paused=false, watchId=null, previewWatchId=null, lastFix=null;
+  let currentSegment=null;
+  const features=[];
 
-      // ikony po čáře
-      function lineIcon(key){ const html=ICON_SVGS[key]||ICON_SVGS.dot; return L.divIcon({ html, className:'', iconSize:[16,16], iconAnchor:[8,8] }); }
-      function lineStyle(p){ return { color: colorForQuality(p.quality), weight: 6, opacity:0.95 } }
-      function placeIconsForLine(layer){
-        if(layer._iconMarkers){ layer._iconMarkers.forEach(m=>iconsLayer.removeLayer(m)); layer._iconMarkers=null; }
-        const p=layer.feature.properties, latlngs=layer.getLatLngs(); if(!latlngs || latlngs.length<2) return;
-        const pts=latlngs.flat?latlngs.flat():latlngs, pix=pts.map(ll=>map.latLngToLayerPoint(ll));
-        let seg=[], tot=0; for(let i=0;i<pix.length-1;i++){ const dx=pix[i+1].x-pix[i].x, dy=pix[i+1].y-pix[i].y; const Ls=Math.hypot(dx,dy); seg.push(Ls); tot+=Ls; }
-        const markers=[], icon=lineIcon(p.surfaceIcon||selSurface.icon), repeat=p.surfaceRepeat||selSurface.repeat||28;
-        for(let d=0; d<=tot; d+=repeat){ let a=0,k=-1; for(let i=0;i<seg.length;i++){ if(a+seg[i]>=d){k=i;break} a+=seg[i]; }
-          if(k<0) continue; const A=pix[k],B=pix[k+1],t=(d-a)/(seg[k]||1),x=A.x+(B.x-A.x)*t,y=A.y+(B.y-A.y)*t; const ll=map.layerPointToLatLng(L.point(x,y));
-          const m=L.marker(ll,{icon,interactive:false,keyboard:false}); iconsLayer.addLayer(m); markers.push(m); }
-        layer._iconMarkers=markers;
-      }
+  let liveMarker=null, liveAccuracy=null;
+  function updateLiveMarker(lat, lon, acc){
+    if(typeof lat!=='number' || typeof lon!=='number') return;
+    const ll=[lat,lon];
+    const blue = getComputedStyle(document.documentElement).getPropertyValue('--blue').trim() || '#3b82f6';
+    if(!liveMarker){
+      liveMarker = L.circleMarker(ll, { radius:6, color: blue, fill:true, fillOpacity:1, weight:2 });
+      liveAccuracy = L.circle(ll, { radius: Math.max(5, acc||10), color: blue, weight:1, fillOpacity:.08 });
+      liveMarker.addTo(liveLayer); liveAccuracy.addTo(liveLayer);
+    } else {
+      liveMarker.setLatLng(ll);
+      liveAccuracy.setLatLng(ll);
+      if(typeof acc==='number' && isFinite(acc)) liveAccuracy.setRadius(Math.max(5, acc));
+    }
+  }
 
-      // ====== Logger + live poloha ======
-      let tracking=false, paused=false, watchId=null, previewWatchId=null, lastFix=null;
-      let currentSegment=null;
-      const features=[];
+  function setStatus(txt, hue){ statusEl.textContent=txt; statusEl.style.background=hue||'#111827'; }
 
-      function pointDivIcon(p){
-        const meta = POINT_ICONS.find(x=>x.key===p.pointIcon) || POINT_ICONS[0];
-        return L.divIcon({ html:`<div style="width:24px;height:24px;color:#ef4444">${meta.svg}</div>`, className:'', iconSize:[24,24], iconAnchor:[12,12] });
-      }
+  function startNewSegment(reason){
+    if(currentSegment && currentSegment.coords.length>1){ finalizeSegment(); }
+    const props={
+      type:'LineString',
+      surface: selSurface.name, surfaceIcon: selSurface.icon, surfaceRepeat: selSurface.repeat,
+      quality: selQuality.name, color: colorForQuality(selQuality.name), width:6,
+      createdAt: new Date().toISOString(), reason
+    };
+    const layer=L.polyline([], lineStyle(props)).addTo(linesLayer);
+    const feat={ type:'Feature', properties: props, geometry:{ type:'LineString', coordinates:[] } };
+    layer.feature=feat;
+    currentSegment={ layer, coords:[], times:[], props };
+  }
+  function finalizeSegment(){
+    if(!currentSegment) return;
+    const {layer, coords, times, props}=currentSegment;
+    if(coords.length<2){ linesLayer.removeLayer(layer); currentSegment=null; return; }
+    layer.feature.geometry.coordinates = coords.slice();
+    layer.feature.properties.times = times.slice();
+    layer.setStyle(lineStyle(props));
+    placeIconsForLine(layer);
+    features.push(layer.feature);
+    currentSegment=null;
+  }
 
-      let liveMarker=null, liveAccuracy=null;
-      function updateLiveMarker(lat, lon, acc){
-        if(typeof lat!=='number' || typeof lon!=='number') return;
-        const blue = '#3b82f6', ll=[lat,lon];
-        if(!liveMarker){
-          liveMarker=L.circleMarker(ll,{radius:6,color:blue,fill:true,fillOpacity:1,weight:2});
-          liveAccuracy=L.circle(ll,{radius:Math.max(5,acc||10),color:blue,weight:1,fillOpacity:.08});
-          liveMarker.addTo(liveLayer); liveAccuracy.addTo(liveLayer);
-        } else { liveMarker.setLatLng(ll); liveAccuracy.setLatLng(ll); if(isFinite(acc)) liveAccuracy.setRadius(Math.max(5,acc)); }
-      }
+  function onPosition(pos){
+    const c={ lat:pos.coords.latitude, lon:pos.coords.longitude, acc:pos.coords.accuracy, ts:new Date(pos.timestamp||Date.now()).toISOString() };
+    lastFix=c; updateLiveMarker(c.lat, c.lon, c.acc);
+    if(!tracking || paused) return;
+    if(!currentSegment) startNewSegment('first-fix');
 
-      function setStatus(t,h){ statusEl.textContent=t; statusEl.style.background=h||'#111827'; }
+    // krok ~3 m
+    if(currentSegment.coords.length){
+      const prev=currentSegment.coords[currentSegment.coords.length-1];
+      const d=haversine(prev[0], prev[1], c.lon, c.lat);
+      if(d<3) return;
+    }
+    currentSegment.coords.push([c.lon, c.lat]);
+    currentSegment.times.push(c.ts);
+    currentSegment.layer.addLatLng([c.lat, c.lon]);
+  }
+  function onError(err){ setStatus('chyba geolokace', 'var(--err)'); console.warn(err); }
 
-      function startNewSegment(reason){
-        if(currentSegment && currentSegment.coords.length>1) finalizeSegment();
-        const props={ type:'LineString', surface:selSurface.name, surfaceIcon:selSurface.icon, surfaceRepeat:selSurface.repeat,
-                      quality:selQuality.name, color:colorForQuality(selQuality.name), width:6, createdAt:new Date().toISOString(), reason };
-        const layer=L.polyline([], lineStyle(props)).addTo(linesLayer);
-        const feat={ type:'Feature', properties:props, geometry:{ type:'LineString', coordinates:[] } };
-        layer.feature=feat; currentSegment={ layer, coords:[], times:[], props };
-      }
-      function finalizeSegment(){
-        if(!currentSegment) return;
-        const {layer,coords,times,props}=currentSegment;
-        if(coords.length<2){ linesLayer.removeLayer(layer); currentSegment=null; return; }
-        layer.feature.geometry.coordinates=coords.slice();
-        layer.feature.properties.times=times.slice();
-        layer.setStyle(lineStyle(props)); placeIconsForLine(layer);
-        features.push(layer.feature); currentSegment=null;
-      }
+  // preview poloha (před startem)
+  function startPreviewWatch(){
+    if(!('geolocation' in navigator)) return;
+    if(previewWatchId!=null) return;
+    previewWatchId = navigator.geolocation.watchPosition((pos)=>{
+      const c={ lat:pos.coords.latitude, lon:pos.coords.longitude, acc:pos.coords.accuracy };
+      lastFix=c; updateLiveMarker(c.lat, c.lon, c.acc);
+      if(!map._centered){ map.setView([c.lat,c.lon], 16); map._centered=true; }
+    }, (e)=>{ console.warn('preview geo err', e); }, { enableHighAccuracy:true, maximumAge:2000, timeout:10000 });
+  }
+  function stopPreviewWatch(){ if(previewWatchId!=null){ navigator.geolocation.clearWatch(previewWatchId); previewWatchId=null; } }
 
-      function onPosition(pos){
-        const c={ lat:pos.coords.latitude, lon:pos.coords.longitude, acc:pos.coords.accuracy, ts:new Date(pos.timestamp||Date.now()).toISOString() };
-        lastFix=c; updateLiveMarker(c.lat,c.lon,c.acc);
-        if(!tracking || paused) return;
-        if(!currentSegment) startNewSegment('first-fix');
-        if(currentSegment.coords.length){
-          const prev=currentSegment.coords[currentSegment.coords.length-1];
-          const d=haversine(prev[0], prev[1], c.lon, c.lat); if(d<3) return;
-        }
-        currentSegment.coords.push([c.lon,c.lat]); currentSegment.times.push(c.ts); currentSegment.layer.addLatLng([c.lat,c.lon]);
-      }
-      function onError(e){ setStatus('chyba geolokace','var(--err)'); console.warn(e); }
+  function start(){
+    if(tracking) return; tracking=true; paused=false; setStatus('běží','var(--acc)');
+    stopPreviewWatch();
+    if(!watchId){ watchId = navigator.geolocation.watchPosition(onPosition, onError, { enableHighAccuracy:true, maximumAge:3000, timeout:20000 }); }
+    if(lastFix){ map.setView([lastFix.lat,lastFix.lon], 17); }
+  }
+  function pause(){ paused=true; setStatus('pauza','var(--warn)'); }
+  function stop(){
+    paused=false; tracking=false; setStatus('zastaveno','var(--warn)');
+    finalizeSegment();
+    if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+    startPreviewWatch();
+  }
 
-      function startPreviewWatch(){
-        if(!('geolocation' in navigator) || previewWatchId!=null) return;
-        previewWatchId = navigator.geolocation.watchPosition((pos)=>{
-          const c={ lat:pos.coords.latitude, lon:pos.coords.longitude, acc:pos.coords.accuracy };
-          lastFix=c; updateLiveMarker(c.lat,c.lon,c.acc);
-          if(!map._centered){ map.setView([c.lat,c.lon], 16); map._centered=true; }
-        }, (e)=>{ console.warn('preview geo err', e); }, { enableHighAccuracy:true, maximumAge:2000, timeout:10000 });
-      }
-      function stopPreviewWatch(){ if(previewWatchId!=null){ navigator.geolocation.clearWatch(previewWatchId); previewWatchId=null; } }
+  // Haversine (m)
+  function haversine(lon1, lat1, lon2, lat2){
+    const toRad = d => d*Math.PI/180; const R=6371000; const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(a));
+  }
 
-      function start(){ if(tracking) return; tracking=true; paused=false; setStatus('běží','var(--acc)');
-        stopPreviewWatch();
-        if(!watchId){ watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,maximumAge:3000,timeout:20000}); }
-        if(lastFix){ map.setView([lastFix.lat,lastFix.lon], 17); }
-      }
-      function pause(){ paused=true; setStatus('pauza','var(--warn)'); }
-      function stop(){ paused=false; tracking=false; setStatus('zastaveno','var(--warn)'); finalizeSegment();
-        if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; } startPreviewWatch(); }
+  // jednorázová ikona
+  function addSinglePoint(key){
+    if(!lastFix){ alert('Ještě nemám polohu. Dej Start a počkej na fix.'); return; }
+    const p={ pointIcon:key, createdAt:new Date().toISOString(), type:'Point' };
+    const feat={ type:'Feature', properties: p, geometry:{ type:'Point', coordinates:[ lastFix.lon, lastFix.lat ] } };
+    const m=L.marker([lastFix.lat,lastFix.lon], { icon: pointDivIcon(p) }).addTo(pointsLayer); m.feature=feat; features.push(feat);
+  }
 
-      // Haversine (m)
-      function haversine(lon1,lat1,lon2,lat2){
-        const R=6371000,toRad=d=>d*Math.PI/180,dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
-        const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-        return 2*R*Math.asin(Math.sqrt(a));
-      }
+  // Export
+  function doExport(){
+    if(currentSegment && currentSegment.coords.length>1){ finalizeSegment(); }
+    const pack={ type:'FeatureCollection', features: features.concat(collectDrawnSegments()), meta:{
+      surfaces:SURFACES, qualities:QUALITIES, pointIcons: POINT_ICONS.map(x=>({key:x.key,label:x.label}))
+    } };
+    const blob=new Blob([JSON.stringify(pack,null,2)],{type:'application/geo+json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='esk8-track.geojson';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+  function collectDrawnSegments(){
+    const arr=[]; linesLayer.eachLayer(l=>{ if(l.feature) arr.push(l.feature); }); pointsLayer.eachLayer(m=>{ if(m.feature) arr.push(m.feature); }); return arr;
+  }
 
-      function addSinglePoint(key){
-        if(!lastFix){ alert('Ještě nemám polohu. Dej Start a počkej na fix.'); return; }
-        const p={ pointIcon:key, createdAt:new Date().toISOString(), type:'Point' };
-        const feat={ type:'Feature', properties:p, geometry:{ type:'Point', coordinates:[lastFix.lon,lastFix.lat] } };
-        const m=L.marker([lastFix.lat,lastFix.lon],{icon:pointDivIcon(p)}).addTo(pointsLayer); m.feature=feat; features.push(feat);
-      }
+  // Smazat
+  function deleteCurrentRecord(){
+    const ok = confirm('Opravdu smazat aktuální záznam? Tato akce je nevratná.');
+    if(!ok) return;
+    if(currentSegment){ try{ linesLayer.removeLayer(currentSegment.layer); }catch{} currentSegment = null; }
+    linesLayer.clearLayers(); pointsLayer.clearLayers(); iconsLayer.clearLayers();
+    features.length = 0; setStatus('záznam smazán','var(--err)');
+  }
 
-      // Export/Smazat
-      function collectDrawn(){ const arr=[]; linesLayer.eachLayer(l=>{ if(l.feature) arr.push(l.feature); }); pointsLayer.eachLayer(m=>{ if(m.feature) arr.push(m.feature); }); return arr; }
-      function doExport(){
-        if(currentSegment && currentSegment.coords.length>1) finalizeSegment();
-        const pack={ type:'FeatureCollection', features: features.concat(collectDrawn()), meta:{
-          surfaces:SURFACES, qualities:QUALITIES, pointIcons: POINT_ICONS.map(x=>({key:x.key,label:x.label}))
-        }};
-        const blob=new Blob([JSON.stringify(pack,null,2)],{type:'application/geo+json'});
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a'); a.href=url; a.download='esk8-track.geojson';
-        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-      }
-      function deleteAll(){
-        const ok=confirm('Opravdu smazat aktuální záznam?'); if(!ok) return;
-        if(currentSegment){ try{ linesLayer.removeLayer(currentSegment.layer); }catch{} currentSegment=null; }
-        linesLayer.clearLayers(); pointsLayer.clearLayers(); iconsLayer.clearLayers(); features.length=0; setStatus('záznam smazán','var(--err)');
-      }
+  // Handlery
+  document.getElementById('btnStart').addEventListener('click', ()=>{ if(!('geolocation' in navigator)){ alert('Prohlížeč nepodporuje geolokaci.'); return; } start(); });
+  document.getElementById('btnPause').addEventListener('click', ()=> pause());
+  document.getElementById('btnStop').addEventListener('click', ()=> stop());
+  document.getElementById('btnExport').addEventListener('click', ()=> doExport());
+  document.getElementById('btnDelete').addEventListener('click', ()=> deleteCurrentRecord());
 
-      // Handlery
-      document.getElementById('btnStart').addEventListener('click', ()=>{ if(!('geolocation' in navigator)){ alert('Prohlížeč nepodporuje geolokaci.'); return; } start(); });
-      document.getElementById('btnPause').addEventListener('click', ()=>pause());
-      document.getElementById('btnStop').addEventListener('click', ()=>stop());
-      document.getElementById('btnExport').addEventListener('click', ()=>doExport());
-      document.getElementById('btnDelete').addEventListener('click', ()=>deleteAll());
+  // init
+  if(navigator.geolocation){ startPreviewWatch(); } else { map.setView([50.0755,14.4378], 13); }
 
-      // init
-      if(navigator.geoloca
+  // legenda
+  function renderLegend(){
+    const el=document.getElementById('legend');
+    el.innerHTML = `Povrch: <b>${selSurface.name}</b> • Kvalita: <span style="color:${colorForQuality(selQuality.name)}"><b>${selQuality.name}</b></span>`;
+  }
+  renderLegend();
+  rowSurfaces.addEventListener('click', renderLegend, true);
+  rowQualities.addEventListener('click', renderLegend, true);
+  </script>
+</body>
+</html>
