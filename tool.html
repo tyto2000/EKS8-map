@@ -33,6 +33,12 @@
     button.danger{background:var(--err);border-color:var(--err);color:#fff}
     .legend{padding:8px 0;color:var(--muted);font-size:12px;border-top:1px dashed #243349;margin-top:8px}
 
+    /* upload tlačítko mezi akcemi a mapou */
+    .uploadbar{padding:12px; background:#0f172a; border-bottom:1px solid var(--border); text-align:center}
+    .uploadbtn{display:inline-block; padding:12px 18px; background:var(--acc); color:#04230e; font-weight:700; border-radius:12px; text-decoration:none; border:1px solid var(--acc)}
+    .uploadbtn:hover{ filter:brightness(1.05) }
+    .uploadhint{color:var(--muted); font-size:12px; margin-top:6px}
+
     /* mapa */
     #map{flex:1; min-height:45vh}
   </style>
@@ -62,6 +68,14 @@
       </div>
       <div class="legend" id="legend"></div>
     </section>
+
+    <!-- odkaz na Google Form (MEZI tlačítky a mapou) -->
+    <div class="uploadbar">
+      <a class="uploadbtn" href="https://forms.gle/2VNdXTozK66ZQKUNA" target="_blank" rel="noopener noreferrer">
+        📤 Zde nahraj geojson soubor, abysme ho zadali do mapy, díky 💚
+      </a>
+      <div class="uploadhint">Otevře se ve nové záložce (Google Form).</div>
+    </div>
 
     <!-- mapa -->
     <div id="map"></div>
@@ -309,7 +323,7 @@
   function deleteCurrentRecord(){
     const ok = confirm('Opravdu smazat aktuální záznam? Tato akce je nevratná.');
     if(!ok) return;
-    if(currentSegment){ try{ linesLayer.removeLayer(currentSegment.layer); }catch{} currentSegment = null; }
+    if(currentSegment){ try{ /* odstranit nedokončený layer */ }catch{} currentSegment = null; }
     linesLayer.clearLayers(); pointsLayer.clearLayers();
     features.length = 0; setStatus('záznam smazán','var(--err)');
   }
