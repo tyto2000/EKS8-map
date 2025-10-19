@@ -1,47 +1,50 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ESK8 – GPS logger (povrch • kvalita • ikony)</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<style>
-  :root{ --bg:#0b1220; --panel:#0f172a; --muted:#9ca3af; --txt:#e5e7eb; --border:#1f2937; --acc:#22c55e; --warn:#f59e0b; --err:#ef4444; --blue:#3b82f6; }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
-  .wrap{display:flex;flex-direction:column;min-height:100vh}
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ESK8 – GPS logger (povrch • kvalita • ikony)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    :root{ --bg:#0b1220; --panel:#0f172a; --muted:#9ca3af; --txt:#e5e7eb; --border:#1f2937; --acc:#22c55e; --warn:#f59e0b; --err:#ef4444; --blue:#3b82f6; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    .wrap{display:flex;flex-direction:column;min-height:100vh}
 
-  header{padding:10px 12px;border-bottom:1px solid var(--border);background:var(--panel);display:flex;justify-content:space-between;align-items:center;gap:10px}
-  h1{margin:0;font-size:16px}
-  .status{font-size:12px;padding:4px 8px;border-radius:999px;background:#111827;border:1px solid var(--border)}
+    header{padding:10px 12px;border-bottom:1px solid var(--border);background:var(--panel);display:flex;justify-content:space-between;align-items:center;gap:10px}
+    h1{margin:0;font-size:16px}
+    .status{font-size:12px;padding:4px 8px;border-radius:999px;background:#111827;border:1px solid var(--border)}
 
-  .controls{padding:10px 12px;display:grid;gap:8px;background:var(--panel);border-bottom:1px solid var(--border)}
-  .row{display:flex;gap:8px;flex-wrap:wrap}
-  .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#0b1020;font-size:13px;cursor:pointer;user-select:none}
-  .chip.active{outline:2px solid rgba(255,255,255,.06);background:#111b2e}
-  .sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
-  .iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
+    /* výběry */
+    .controls{padding:10px 12px;display:grid;gap:8px;background:var(--panel);border-bottom:1px solid var(--border)}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:#0b1020;font-size:13px;cursor:pointer;user-select:none}
+    .chip.active{outline:2px solid rgba(255,255,255,.06);background:#111b2e}
+    .sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
+    .iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
 
-  .actions{padding:10px 12px;background:rgba(17,24,39,.9);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-  .btnbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-  button{padding:12px;border-radius:12px;border:1px solid var(--border);background:#111827;color:var(--txt);font:inherit;cursor:pointer}
-  button.primary{background:#16a34a;border-color:#16a34a;color:#051807}
-  button.warn{background:var(--warn);border-color:var(--warn);color:#1a1300}
-  button.danger{background:var(--err);border-color:var(--err);color:#fff}
-  .legend{padding:8px 0;color:var(--muted);font-size:12px;border-top:1px dashed #243349;margin-top:8px}
+    /* ovladače nad mapou */
+    .actions{padding:10px 12px;background:rgba(17,24,39,.9);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .btnbar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+    button{padding:12px;border-radius:12px;border:1px solid var(--border);background:#111827;color:var(--txt);font:inherit;cursor:pointer}
+    button.primary{background:#16a34a;border-color:#16a34a;color:#051807}
+    button.warn{background:var(--warn);border-color:var(--warn);color:#1a1300}
+    button.danger{background:var(--err);border-color:var(--err);color:#fff}
+    .legend{padding:8px 0;color:var(--muted);font-size:12px;border-top:1px dashed #243349;margin-top:8px}
 
-  .uploadbar{padding:12px;background:#0f172a;border-bottom:1px solid var(--border);text-align:center}
-  .uploadbtn{display:inline-block;padding:12px 18px;background:var(--acc);color:#04230e;font-weight:700;border-radius:12px;text-decoration:none;border:1px solid var(--acc)}
-  .uploadbtn:hover{filter:brightness(1.05)}
-  .uploadhint{color:var(--muted);font-size:12px;margin-top:6px}
+    /* tlačítko na Form – mezi ovládáním a mapou */
+    .uploadbar{padding:12px;background:#0f172a;border-bottom:1px solid var(--border);text-align:center}
+    .uploadbtn{display:inline-block;padding:12px 18px;background:var(--acc);color:#04230e;font-weight:700;border-radius:12px;text-decoration:none;border:1px solid var(--acc)}
+    .uploadbtn:hover{filter:brightness(1.05)}
+    .uploadhint{color:var(--muted);font-size:12px;margin-top:6px}
 
-  /* mapa musí mít reálnou výšku; flex:1 + min-height zajistí, že je vždy vidět */
-  #map{flex:1;min-height:48vh}
+    /* mapa zabere zbytek výšky */
+    #map{flex:1;min-height:50vh}
 
-  /* chybový banner */
-  #errbar{display:none;position:fixed;left:50%;transform:translateX(-50%);top:10px;background:#7f1d1d;color:#fff;padding:8px 12px;border-radius:10px;z-index:99999}
-</style>
+    /* chybový banner */
+    #errbar{display:none;position:fixed;left:50%;transform:translateX(-50%);top:10px;background:#7f1d1d;color:#fff;padding:8px 12px;border-radius:10px;z-index:99999}
+  </style>
 </head>
 <body>
 <div id="errbar"></div>
@@ -71,12 +74,13 @@
     <div class="legend" id="legend"></div>
   </section>
 
-  <!-- jednoduchý odkaz na Form (MEZI tlačítky a mapou) -->
+  <!-- odkaz na Google Form (MEZI tlačítky a mapou). Otevírá se do stejného okna, funguje i v sandboxu -->
   <div class="uploadbar">
-    <a class="uploadbtn" href="https://forms.gle/2VNdXTozK66ZQKUNA" target="_blank" rel="noopener noreferrer">
+    <a class="uploadbtn" id="formLink"
+       href="https://forms.gle/2VNdXTozK66ZQKUNA">
       📤 Zde nahraj geojson soubor, abysme ho zadali do mapy, díky 💚
     </a>
-    <div class="uploadhint">Otevře se ve nové záložce (Google Form). Pokud běží v záložce „Tool“ (iframe), ujisti se, že má iframe v indexu <code>allow-popups</code>.</div>
+    <div class="uploadhint">Pokud chceš otevřít ve <b>nové záložce</b>, povol v indexu u iframu <code>allow-popups</code> a přidej <code>target="_blank"</code>.</div>
   </div>
 
   <!-- mapa -->
@@ -86,8 +90,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function(){
-  // ——— pomocný chybový banner
-  function err(msg){ try{const b=document.getElementById('errbar'); b.textContent=msg; b.style.display='block'; setTimeout(()=>b.style.display='none', 4000);}catch{} }
+  // ——— chybový banner
+  function err(msg){ const b=document.getElementById('errbar'); b.textContent=msg; b.style.display='block'; setTimeout(()=>b.style.display='none', 4000); }
 
   document.addEventListener('DOMContentLoaded', () => {
     try{
@@ -288,7 +292,8 @@
           surfaces:SURFACES, qualities:QUALITIES, pointIcons: POINT_ICONS.map(x=>({key:x.key,label:x.label}))
         }};
         const blob=new Blob([JSON.stringify(pack,null,2)],{type:'application/geo+json'});
-        const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='esk8-track.geojson';
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a'); a.href=url; a.download='esk8-track.geojson';
         document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
       }
       function deleteAll(){
@@ -305,11 +310,4 @@
       document.getElementById('btnDelete').addEventListener('click', ()=>deleteAll());
 
       // init
-      if(navigator.geolocation){ startPreviewWatch(); } else { map.setView([50.0755,14.4378], 13); }
-
-    }catch(e){ console.error(e); err('Chyba skriptu: '+(e?.message||String(e))); }
-  });
-})();
-</script>
-</body>
-</html>
+      if(navigator.geoloca
