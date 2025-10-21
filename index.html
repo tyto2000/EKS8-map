@@ -171,8 +171,18 @@
       return { color, weight: Number(p.width ?? 6), opacity: 0.95 };
     }
 
-    function fmtCreated(iso){ try{ const d=new Date(iso); const pad=n=>String(n).padStart(2,'0'); return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}` }catch{ return '' } }
-
+function fmtCreated(iso){
+  try{
+    if(!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const months = ['leden','únor','březen','duben','květen','červen','červen',
+                    'červenec','srpen','září','říjen','listopad','prosinec'];
+    return `${months[d.getMonth()]} ${d.getFullYear()}`;
+  }catch{
+    return '';
+  }
+}
     function showBanner(msg, isError=false){ const b=document.getElementById('banner'); b.textContent=msg; b.className = isError? 'error': ''; if(!isError) setTimeout(()=>b.remove(),1800); }
 
     function placeIconsForLine(lineLayer){
