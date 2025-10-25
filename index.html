@@ -176,7 +176,7 @@ function fmtCreated(iso){
     if(!iso) return '';
     const d = new Date(iso);
     if (isNaN(d)) return '';
-    const months = ['leden','únor','březen','duben','květen','červen','červen',
+    const months = ['leden','únor','březen','duben','květen','červen',
                     'červenec','srpen','září','říjen','listopad','prosinec'];
     return `${months[d.getMonth()]} ${d.getFullYear()}`;
   }catch{
