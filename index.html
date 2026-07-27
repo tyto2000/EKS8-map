@@ -661,6 +661,28 @@ async function loadProfile() {
   state.profile = data;
 }
 
+async function ensureRequiredMapOptions() {
+  if (!isAdmin()) return;
+
+  const hasStairs = state.options.surface.some(option =>
+    ["schody", "schodiště"].includes(normalizeText(option.label))
+  );
+  if (hasStairs) return;
+
+  const { error } = await sb.from("map_options").insert({
+    kind: "surface",
+    label: "Schody",
+    sort_order: 900,
+    color: null,
+    icon: null,
+    active: true
+  });
+
+  if (error) throw error;
+  await loadOptions();
+  toast("Do povrchů byla doplněna kategorie Schody.", "success");
+}
+
 function renderAuthUi() {
   const logged = !!state.session;
   el("authBtn").textContent = logged ? "Odhlásit" : "Přihlásit";
@@ -689,7 +711,10 @@ async function initialize() {
     const { data: { session } } = await sb.auth.getSession();
     state.session = session;
     await Promise.all([loadOptions(), loadFeatures()]);
-    if (session) await loadProfile();
+    if (session) {
+      await loadProfile();
+      await ensureRequiredMapOptions();
+    }
     renderAuthUi();
     subscribeRealtime();
     setConnection("Mapa je online");
@@ -1062,16 +1087,54 @@ function normalizeText(value) {
   return String(value ?? "").trim().toLocaleLowerCase("cs-CZ");
 }
 
+function optionAliasCandidates(kind, rawValue) {
+  const value = normalizeText(rawValue);
+
+  const aliases = {
+    surface: {
+      "asfalt": ["asfalt"],
+      "dlažba / kostky": ["dlažba / kostky", "dlažba", "kostky", "dlažební kostky"],
+      "štěrk / prach": ["štěrk / prach", "štěrk", "šotolina", "prach"],
+      "hlína": ["hlína", "hliněný povrch", "zemina"],
+      "panely": ["panely", "beton / panely", "beton", "betonové panely"],
+      "schody": ["schody", "schodiště"]
+    },
+    quality: {
+      "hladký": ["výborný", "hladký", "perfektní", "velmi dobrý"],
+      "ok": ["dobrý", "ok", "průměrný", "běžný"],
+      "výtluky": ["špatný", "výtluky", "poškozený", "velmi špatný"],
+      "nebezpečí": ["nebezpečný", "nebezpečí", "kritický", "nesjízdný"]
+    },
+    warning: {
+      "speed_bump": ["nerovnost", "zpomalovací práh", "retardér"],
+      "warning": ["výstraha", "nebezpečí", "upozornění"],
+      "zavora": ["závora", "zavora"],
+      "railcross": ["koleje / přejezd", "koleje", "železniční přejezd", "přejezd"]
+    }
+  };
+
+  return aliases[kind]?.[value] || [value];
+}
+
 function findOptionId(kind, properties, keys) {
   for (const key of keys) {
     const raw = properties?.[key];
     if (!raw) continue;
+
     const byId = state.options[kind].find(o => o.id === raw);
     if (byId) return byId.id;
-    const wanted = normalizeText(raw);
-    const byLabel = state.options[kind].find(o => normalizeText(o.label) === wanted);
-    if (byLabel) return byLabel.id;
+
+    const candidates = optionAliasCandidates(kind, raw).map(normalizeText);
+    const exact = state.options[kind].find(o => candidates.includes(normalizeText(o.label)));
+    if (exact) return exact.id;
+
+    const partial = state.options[kind].find(o => {
+      const label = normalizeText(o.label);
+      return candidates.some(candidate => label.includes(candidate) || candidate.includes(label));
+    });
+    if (partial) return partial.id;
   }
+
   return state.options[kind][0]?.id || null;
 }
 
@@ -1286,8 +1349,12 @@ el("registerBtn").addEventListener("click", async () => {
 sb.auth.onAuthStateChange(async (_event, session) => {
   state.session = session;
   try {
-    if (session) await loadProfile();
-    else state.profile = null;
+    if (session) {
+      await loadProfile();
+      await ensureRequiredMapOptions();
+    } else {
+      state.profile = null;
+    }
     renderAuthUi();
     await loadFeatures();
     if (!session) closePanels();
