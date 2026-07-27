@@ -931,21 +931,30 @@ async function loadAdmin() {
   if (pe) throw pe;
   if (oe) throw oe;
 
-  el("userList").innerHTML = (profiles || []).map(p => `<div class="user-card">
-    <div class="row">
-      <div style="flex:1;min-width:0">
-        <div class="feature-title">${escapeHtml(p.display_name || p.email || p.id)}</div>
-        <div class="feature-meta">${escapeHtml(p.email || "")}</div>
+  el("userList").innerHTML = (profiles || []).map(p => {
+    const userFeatures = state.features.filter(f => f.owner_id === p.id);
+    const lineCount = userFeatures.filter(f => f.kind === "line").length;
+    const pointCount = userFeatures.filter(f => f.kind !== "line").length;
+    return `<div class="user-card">
+      <div class="row">
+        <div style="flex:1;min-width:0">
+          <div class="feature-title">${escapeHtml(p.display_name || p.email || p.id)}</div>
+          <div class="feature-meta">${escapeHtml(p.email || "")}</div>
+          <div class="feature-meta">Úseky: ${lineCount} · Body: ${pointCount} · Celkem: ${userFeatures.length}</div>
+        </div>
+        <span class="badge ${p.role === "admin" ? "admin" : ""}">${p.role}</span>
+        ${p.is_blocked ? `<span class="badge blocked">blokován</span>` : ""}
       </div>
-      <span class="badge ${p.role === "admin" ? "admin" : ""}">${p.role}</span>
-      ${p.is_blocked ? `<span class="badge blocked">blokován</span>` : ""}
-    </div>
-    <div class="row" style="margin-top:8px">
-      <button class="btn small ${p.is_blocked ? "" : "danger"}" data-block-user="${p.id}" data-block-value="${!p.is_blocked}">
-        ${p.is_blocked ? "Odblokovat" : "Zablokovat"}
-      </button>
-    </div>
-  </div>`).join("");
+      <div class="row wrap" style="margin-top:8px">
+        <button class="btn small ${p.is_blocked ? "" : "danger"}" data-block-user="${p.id}" data-block-value="${!p.is_blocked}">
+          ${p.is_blocked ? "Odblokovat" : "Zablokovat"}
+        </button>
+        <button class="btn small danger" data-delete-user-features="${p.id}" data-user-label="${escapeHtml(p.email || p.display_name || p.id)}" data-feature-count="${userFeatures.length}" ${userFeatures.length ? "" : "disabled"}>
+          🗑 Smazat všechna data
+        </button>
+      </div>
+    </div>`;
+  }).join("");
 
   el("userList").querySelectorAll("[data-block-user]").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -957,6 +966,41 @@ async function loadAdmin() {
         await loadAdmin();
         toast("Stav uživatele změněn.", "success");
       } catch (e) { toast(e.message, "error"); }
+    });
+  });
+
+
+  el("userList").querySelectorAll("[data-delete-user-features]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const userId = btn.dataset.deleteUserFeatures;
+      const userLabel = btn.dataset.userLabel || userId;
+      const count = Number(btn.dataset.featureCount || 0);
+      if (!count) return;
+
+      const firstConfirm = confirm(
+        `Opravdu chceš smazat všechna mapová data uživatele ${userLabel}?\n\nBude odstraněno ${count} prvků. Tuto akci nelze vrátit.`
+      );
+      if (!firstConfirm) return;
+
+      const typed = prompt(`Pro potvrzení napiš přesně e-mail nebo označení uživatele:\n${userLabel}`);
+      if (typed !== userLabel) {
+        toast("Mazání zrušeno – potvrzovací text nesouhlasí.", "error");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Mažu…";
+      try {
+        const { error } = await sb.from("map_features").delete().eq("owner_id", userId);
+        if (error) throw error;
+        await loadFeatures();
+        await loadAdmin();
+        toast(`Všechna data uživatele ${userLabel} byla smazána.`, "success");
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = "🗑 Smazat všechna data";
+        toast(e.message || "Mazání selhalo.", "error");
+      }
     });
   });
 
