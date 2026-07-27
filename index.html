@@ -3,92 +3,616 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mapa povrchů – Supabase viewer + Tool</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <title>Editor – linie + body (SVG) – beta 10 PERF</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
   <style>
-    :root{--bg:#0b1220;--panel:#0f172a;--border:#1f2937;--txt:#e5e7eb;--muted:#9ca3af;--tab:#111827;--tab-act:#1f2937;--accent:#22c55e;--err:#b91c1c}
-    *{box-sizing:border-box} html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif} #app{display:flex;flex-direction:column;height:100%}
-    .tabs{display:flex;gap:8px;padding:8px;background:var(--panel);border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap}.tab{appearance:none;border:1px solid var(--border);background:var(--tab);color:var(--txt);padding:8px 12px;border-radius:10px;cursor:pointer;font:inherit}.tab.active{background:var(--tab-act);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}.tabs .spacer{flex:1}
-    .auth{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.auth input{width:170px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:#0b1020;color:var(--txt)}.auth button{padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:#111827;color:var(--txt);cursor:pointer}.auth .primary{background:#16a34a;border-color:#16a34a;color:#041407;font-weight:700}.auth .danger{background:#b91c1c;border-color:#b91c1c;color:#fff}.authStatus{font-size:12px;color:var(--muted)}
-    #viewerWrap{position:relative;display:flex;flex-direction:column;height:100%}#map{flex:1}#banner{position:fixed;top:58px;left:50%;transform:translateX(-50%);background:#111827;color:#e5e7eb;padding:8px 12px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:14px;z-index:1000}#banner.error{background:#7f1d1d}#banner small{color:#9ca3af}
-    #legend{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);color:#111827;border-top:1px solid #e5e7eb;padding:8px 10px;z-index:1001;display:flex;align-items:center;gap:10px;backdrop-filter:saturate(120%) blur(4px)}#legend .title{font-size:13px;font-weight:600;white-space:nowrap}#legend .items{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;flex:1}#legend .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:999px;background:#fff;font-size:12px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.06)}#legend .sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.15);flex:0 0 auto}.iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}.iconbox svg{display:block}.pticon{display:inline-flex;align-items:center;justify-content:center}.leaflet-bottom{bottom:56px}@media(max-width:720px){.auth input{width:130px}.authStatus{width:100%}#banner{top:104px}}@media(max-width:520px){#legend{padding:6px 8px}.leaflet-bottom{bottom:50px}}
-    #toolWrap{display:none;height:100%;flex-direction:column}#toolFrame{border:0;width:100%;height:100%}.toolNote{padding:10px;background:var(--panel);border-top:1px solid var(--border);color:var(--muted);font-size:13px}.toolNote a{color:#a7f3d0;text-decoration:none}.adminBox{display:none;gap:8px;align-items:center}.adminBox.show{display:flex}.adminBox button{background:#b91c1c;border-color:#b91c1c;color:#fff}
-  .hidden{display:none!important}
+    :root{ --bg:#0b1220; --card:#0f172a; --muted:#9ca3af; --txt:#e5e7eb; --border:#1f2937; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    .layout{display:grid;grid-template-columns:380px 1fr; height:100vh}
+    aside{background:#0f172a;border-right:1px solid var(--border);padding:12px 12px 80px;overflow:auto}
+    h1{font-size:20px;margin:6px 0 12px}
+    label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+    select, input[type="text"], input[type="number"], textarea, input[type="datetime-local"]{
+      width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#0b1020;color:#e5e7eb;
+    }
+    .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);padding:10px 12px;border-radius:12px;background:#111827;color:#e5e7eb;cursor:pointer}
+    .btn.primary{background:#16a34a;border-color:#16a34a}
+    .row{display:flex;gap:8px;align-items:center}
+    .sep{height:1px;background:var(--border);margin:12px 0}
+    #map{height:100%;}
+    .legend{position:fixed;left:380px;right:0;bottom:0;background:rgba(255,255,255,.04);border-top:1px solid var(--border);backdrop-filter:blur(4px);padding:6px 10px;display:flex;gap:8px;align-items:center;z-index:500}
+    .legend .items{display:flex;gap:6px;overflow:auto}
+    .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);padding:6px 8px;border-radius:999px;background:#0b1020;font-size:12px;white-space:nowrap}
+    .sw{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
+    .iconbox{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center}
+    .pticon{display:inline-flex;align-items:center;justify-content:center}
+    .muted{color:#94a3b8}
+    .readonly{background:#0b1020;border:1px dashed #334155;color:#cbd5e1;border-radius:8px;padding:8px 10px;font-size:12px}
+    .leaflet-draw-toolbar a{background:#0b1020;border:1px solid #233047}
+    .leaflet-draw-toolbar a:hover{background:#111b2e}
   </style>
 </head>
 <body>
-<div id="app">
-  <div class="tabs">
-    <button class="tab active" id="tabMap">Mapa</button><button class="tab" id="tabTool">Tool</button>
-    <div class="spacer"></div>
-    <div class="auth">
-      <input id="email" type="email" placeholder="e-mail"><input id="password" type="password" placeholder="heslo">
-      <button id="loginBtn" class="primary">Přihlásit</button><button id="registerBtn">Registrovat</button><button id="logoutBtn" class="danger hidden">Odhlásit</button>
-      <span id="authStatus" class="authStatus">Nepřihlášeno</span>
-      <span id="adminBox" class="adminBox"><button id="deleteSelectedBtn" disabled>Smazat vybraný bod/úsek</button></span>
-    </div>
+  <div class="layout">
+    <aside>
+      <h1>Mapa povrchů (PERF safe zoom)</h1>
+
+      <label>Typ prvku</label>
+      <select id="geomType">
+        <option value="LineString">Úsek (linie)</option>
+        <option value="Point">Bod</option>
+      </select>
+
+      <label>Povrch (linie – ikonky po čáře)</label>
+      <div class="row">
+        <select id="surfaceSelect"></select>
+        <button class="btn" id="manageSurfaces">Správa</button>
+      </div>
+
+      <label>Kvalita (barva – pouze linie)</label>
+      <div class="row">
+        <select id="quality"></select>
+        <button class="btn" id="manageQualities">Správa</button>
+      </div>
+
+      <div class="row">
+        <div style="flex:1">
+          <label>Šířka čáry (linie)</label>
+          <input type="number" id="width" min="1" max="20" value="6"/>
+        </div>
+        <div style="flex:1">
+          <label>Tag</label>
+          <input type="text" id="tag" placeholder="kořeny, koleje…"/>
+        </div>
+      </div>
+
+      <label>Poznámka</label>
+      <textarea id="note" rows="3" placeholder="co čekat, doporučení…"></textarea>
+
+      <div class="sep"></div>
+
+      <h3>Piktogram bodu</h3>
+      <div class="row">
+        <select id="pointIcon"></select>
+        <input type="number" id="pointSize" min="16" max="48" value="24" style="width:100px"/>
+      </div>
+      <div class="muted">Všechny body jsou červené; piktogramy jsou <b>jednoduché SVG</b>.</div>
+
+      <div class="sep"></div>
+
+      <h3>Datum přidání (volitelné pro nové prvky)</h3>
+      <input type="datetime-local" id="createdAtGlobal" />
+      <div class="muted">Když necháš prázdné, použije se aktuální čas.</div>
+
+      <div class="sep"></div>
+      <div class="row">
+        <button class="btn primary" id="startDraw">Začít kreslit</button>
+        <button class="btn" id="stopDraw">Ukončit</button>
+      </div>
+
+      <div class="sep"></div>
+      <div class="row">
+        <button class="btn" id="exportBtn">Export GeoJSON</button>
+        <input type="file" id="importInput" accept=".json,.geojson" style="display:none"/>
+        <button class="btn" id="importBtn">Import</button>
+      </div>
+
+      <div class="sep"></div>
+      <div class="chip">Linie: barva = kvalita • Body: červené SVG piktogramy • <code>createdAt</code> automaticky + ručně</div>
+
+      <div class="sep"></div>
+      <div id="surfaceManager" style="display:none">
+        <h3>Správa povrchů</h3>
+        <div class="row">
+          <input type="text" id="newSurfaceName" placeholder="Název povrchu (např. asfalt)"/>
+          <select id="newSurfaceIcon"></select>
+          <input type="number" id="newRepeat" min="8" max="80" value="28" style="width:110px" />
+          <button class="btn" id="addSurface">Přidat</button>
+        </div>
+        <small class="muted">Opakování ikony po čáře v pixelech (adaptivně se ředí při velkém zoomu)</small>
+        <div id="surfaceList" style="margin-top:10px;display:grid;gap:6px"></div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div id="qualityManager" style="display:none">
+        <h3>Správa kvality</h3>
+        <div class="row">
+          <input type="text" id="newQualityName" placeholder="název (hladký / ok / výtluky / nebezpečí)"/>
+          <input type="color" id="newQualityColor" value="#22c55e" style="width:70px;height:42px;padding:0;border-radius:10px;border:1px solid var(--border)"/>
+          <button class="btn" id="addQuality">Přidat</button>
+        </div>
+        <div id="qualityList" style="margin-top:10px;display:grid;gap:6px"></div>
+      </div>
+    </aside>
+    <div id="map"></div>
   </div>
-  <section id="viewerWrap"><div id="map"></div><div id="banner">Načítám data ze Supabase…</div><div id="legend"><div class="title">Legenda</div><div class="items" id="legendItems"></div></div></section>
-  <section id="toolWrap"><iframe id="toolFrame" src="./tool.html" sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"></iframe><div class="toolNote">Tool běží odděleně, ale používá stejný Supabase login. <a href="./tool.html" target="_blank" rel="noopener">Otevřít Tool v nové záložce</a>.</div></section>
-</div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-const SUPABASE_URL = "https://sjmylzrhqrwoggowimtq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_F3RaL5kYzaJY8iHzLxRKpw_R3lJGLvf";
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const tabMap=document.getElementById('tabMap'),tabTool=document.getElementById('tabTool'),viewerWrap=document.getElementById('viewerWrap'),toolWrap=document.getElementById('toolWrap');
-function activate(tab){ if(tab==='map'){tabMap.classList.add('active');tabTool.classList.remove('active');viewerWrap.style.display='flex';toolWrap.style.display='none';setTimeout(()=>{map.invalidateSize();updateAllIcons();},50)}else{tabTool.classList.add('active');tabMap.classList.remove('active');viewerWrap.style.display='none';toolWrap.style.display='flex'}}
-tabMap.onclick=()=>activate('map'); tabTool.onclick=()=>activate('tool');
-const email=document.getElementById('email'),password=document.getElementById('password'),loginBtn=document.getElementById('loginBtn'),registerBtn=document.getElementById('registerBtn'),logoutBtn=document.getElementById('logoutBtn'),authStatus=document.getElementById('authStatus'),adminBox=document.getElementById('adminBox'),deleteSelectedBtn=document.getElementById('deleteSelectedBtn');
-let currentUser=null,isAdmin=false,selectedFeatureId=null;
-async function refreshSession(){ const {data:{user}}=await supabaseClient.auth.getUser(); currentUser=user; logoutBtn.classList.toggle('hidden',!user); loginBtn.classList.toggle('hidden',!!user); registerBtn.classList.toggle('hidden',!!user); email.classList.toggle('hidden',!!user); password.classList.toggle('hidden',!!user); if(!user){isAdmin=false;authStatus.textContent='Nepřihlášeno';adminBox.classList.remove('show');return} const {data:profile}=await supabaseClient.from('profiles').select('role,display_name,email').eq('id',user.id).single(); isAdmin=profile?.role==='admin'; authStatus.textContent=`${profile?.display_name||user.email}${isAdmin?' · admin':''}`; adminBox.classList.toggle('show',isAdmin); deleteSelectedBtn.disabled=!(isAdmin&&selectedFeatureId); }
-loginBtn.onclick=async()=>{const {error}=await supabaseClient.auth.signInWithPassword({email:email.value.trim(),password:password.value}); if(error) return showBanner(error.message,true); await refreshSession(); showBanner('Přihlášeno ✔')};
-registerBtn.onclick=async()=>{const {error}=await supabaseClient.auth.signUp({email:email.value.trim(),password:password.value}); if(error) return showBanner(error.message,true); await refreshSession(); showBanner('Registrace hotová. Možná bude potřeba potvrdit e-mail.')};
-logoutBtn.onclick=async()=>{await supabaseClient.auth.signOut(); await refreshSession(); showBanner('Odhlášeno')}; supabaseClient.auth.onAuthStateChange(()=>refreshSession());
-const map=L.map('map').setView([50.0755,14.4378],13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'&copy; OpenStreetMap přispěvatelé'}).addTo(map);
-const dbLayer=L.featureGroup().addTo(map),iconsLayer=new L.FeatureGroup().addTo(map); const lineLayers=[]; const layerById=new Map();
-const ICON_SVGS={dot:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',square:'<svg width="16" height="16" viewBox="0 0 16 16"><rect x="4.2" y="4.2" width="7.6" height="7.6" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',diamond:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2 L14 8 L8 14 L2 8 Z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',triangle:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 3 L13 13 H3 Z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',star:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2 L9.9 6.5 L15 6.5 L10.7 9.6 L12.5 14 L8 11.2 L3.5 14 L5.3 9.6 L1 6.5 L6.1 6.5 Z" fill="#fff" stroke="#111" stroke-width="1.1"/></svg>',stairs:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 12 H12 V10 H10 V8 H8 V6 H6 V4 H4 Z" fill="#fff" stroke="#111" stroke-width="1.1"/></svg>',brick:'<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="8" fill="#fff" stroke="#111" stroke-width="1"/><path d="M2 8 H14 M6 4 V8 M10 8 V12" stroke="#111" stroke-width="1"/></svg>',plank:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 5 H14 M2 8 H14 M2 11 H14" stroke="#111" stroke-width="1.6"/></svg>',pebble:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="8" r="2.4" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="6" r="1.9" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="11" r="1.5" fill="#fff" stroke="#111" stroke-width="1"/></svg>'};
-const POINT_COLOR="#ef4444"; const POINT_ICONS={warning:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 3L2.5 20h19L12 3z" fill="white" stroke="currentColor" stroke-width="2"/><path d="M12 8v6M12 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',speed_bump:'<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="9" fill="white" stroke="currentColor" stroke-width="2"/><path d="M6 14c2-3 10-3 12 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="14" x2="19" y2="14" stroke="currentColor" stroke-width="2"/></svg>',zavora:'<svg viewBox="0 0 24 24" width="100%" height="100%"><rect x="4" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="17" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="5" y="9" width="14" height="4" rx="1" fill="white" stroke="currentColor" stroke-width="2"/><path d="M6 9.5 L9 12.5 M9 9.5 L12 12.5 M12 9.5 L15 12.5 M15 9.5 L18 12.5" stroke="currentColor" stroke-width="2"/></svg>',railcross:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 5 L19 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M5 5 L19 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',pin:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 22s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z" fill="white" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></svg>'};
-let surfaces=[{name:'asfalt',icon:'dot',repeat:28},{name:'dlažba / kostky',icon:'brick',repeat:28},{name:'štěrk / prach',icon:'pebble',repeat:28},{name:'schody',icon:'stairs',repeat:32},{name:'dřevo / lávka',icon:'plank',repeat:32},{name:'hlína',icon:'triangle',repeat:30}];
-let qualities=[{name:'hladký',color:'#22c55e'},{name:'ok',color:'#f59e0b'},{name:'výtluky',color:'#ef4444'},{name:'nebezpečí',color:'#111827'}];
-function qualitiesByName(){return Object.fromEntries(qualities.map(q=>[q.name,q]))} function surfacesByName(){return Object.fromEntries(surfaces.map(s=>[s.name,s]))} function colorForQuality(q){return qualitiesByName()[q]?.color||'#38bdf8'} function iconFor(k){return L.divIcon({html:ICON_SVGS[k]||ICON_SVGS.dot,className:'',iconSize:[16,16],iconAnchor:[8,8]})}
-function pointDivIcon(props){const size=Math.max(16,Math.min(48,Number(props.pointSize||24)));const key=props.pointIcon||'warning';const svg=POINT_ICONS[key]||POINT_ICONS.warning;return L.divIcon({html:`<div class="pticon" style="width:${size}px;height:${size}px;color:${POINT_COLOR}">${svg}</div>`,className:'',iconSize:[size,size],iconAnchor:[size/2,size/2]})}
-function styleFor(f){const p=f.properties||{}; if(f.geometry&&f.geometry.type==='Point')return{}; return {color:p.color||colorForQuality(p.quality),weight:Number(p.width??6),opacity:.95}}
-function fmtCreated(iso){try{if(!iso)return'';const d=new Date(iso);if(isNaN(d))return'';return d.toLocaleDateString('cs-CZ',{month:'long',year:'numeric'})}catch{return''}}
-function showBanner(msg,isError=false){const b=document.getElementById('banner'); if(!b)return; b.textContent=msg; b.className=isError?'error':''; if(!isError)setTimeout(()=>{if(b.textContent===msg)b.textContent=''},1800)}
-function selectDbFeature(id){selectedFeatureId=id;deleteSelectedBtn.disabled=!(isAdmin&&selectedFeatureId); if(isAdmin)showBanner('Vybráno pro smazání')}
-function placeIconsForLine(lineLayer){if(lineLayer._iconMarkers){lineLayer._iconMarkers.forEach(m=>iconsLayer.removeLayer(m));lineLayer._iconMarkers=null}const f=lineLayer.feature||lineLayer.toGeoJSON(),p=f.properties||{},sMap=surfacesByName();let surf=sMap[p.surface]||{name:p.surface||'povrch',icon:p.surfaceIcon||'dot',repeat:Number(p.surfaceRepeat||28)};const repeat=Math.max(8,Number(surf.repeat||28)),icon=iconFor(surf.icon),pts=lineLayer.getLatLngs().flat?lineLayer.getLatLngs().flat():lineLayer.getLatLngs();if(!pts||pts.length<2)return;const pix=pts.map(ll=>map.latLngToLayerPoint(ll));let segLens=[],total=0;for(let i=0;i<pix.length-1;i++){const len=Math.hypot(pix[i+1].x-pix[i].x,pix[i+1].y-pix[i].y);segLens.push(len);total+=len}if(total<4)return;const markers=[];for(let d=0;d<=total;d+=repeat){let acc=0,k=-1;for(let i=0;i<segLens.length;i++){if(acc+segLens[i]>=d){k=i;break}acc+=segLens[i]}if(k<0)continue;const A=pix[k],B=pix[k+1],Lseg=segLens[k],t=Lseg?(d-acc)/Lseg:0,ll=map.layerPointToLatLng(L.point(A.x+(B.x-A.x)*t,A.y+(B.y-A.y)*t));const m=L.marker(ll,{icon,interactive:false,keyboard:false});iconsLayer.addLayer(m);markers.push(m)}lineLayer._iconMarkers=markers}
-function updateAllIcons(){lineLayers.forEach(l=>placeIconsForLine(l))} map.on('zoomend moveend',updateAllIcons);
-function renderLegend(){const wrap=document.getElementById('legendItems');wrap.innerHTML='';qualities.forEach(q=>{const chip=document.createElement('div');chip.className='chip';const sw=document.createElement('span');sw.className='sw';sw.style.background=q.color;chip.appendChild(sw);chip.appendChild(Object.assign(document.createElement('span'),{textContent:q.name}));wrap.appendChild(chip)});surfaces.forEach(s=>{const chip=document.createElement('div');chip.className='chip';const iconbox=document.createElement('span');iconbox.className='iconbox';iconbox.innerHTML=ICON_SVGS[s.icon]||ICON_SVGS.dot;chip.appendChild(iconbox);chip.appendChild(Object.assign(document.createElement('span'),{textContent:s.name}));wrap.appendChild(chip)});[['warning','pozor'],['speed_bump','retardér'],['zavora','závora'],['railcross','přejezd'],['pin','bod']].forEach(([key,label])=>{const chip=document.createElement('div');chip.className='chip';const iconbox=document.createElement('span');iconbox.className='iconbox';iconbox.innerHTML=`<div class="pticon" style="width:18px;height:18px;color:#ef4444">${POINT_ICONS[key]}</div>`;chip.appendChild(iconbox);chip.appendChild(Object.assign(document.createElement('span'),{textContent:label}));wrap.appendChild(chip)})}
-function featureFromRow(row){return {type:'Feature',id:row.id,properties:{...(row.properties||{}),dbId:row.id,createdAt:row.created_at,author:row.created_by},geometry:row.geom}}
-function removeRow(id){const layer=layerById.get(id);if(!layer)return;if(layer._iconMarkers)layer._iconMarkers.forEach(m=>iconsLayer.removeLayer(m));dbLayer.removeLayer(layer);layerById.delete(id);const idx=lineLayers.indexOf(layer);if(idx>=0)lineLayers.splice(idx,1)}
-function addRow(row,fit=false){removeRow(row.id);const feature=featureFromRow(row);const layer=L.geoJSON(feature,{style:styleFor,pointToLayer:(f,latlng)=>L.marker(latlng,{icon:pointDivIcon(f.properties||{})}),onEachFeature:(feature,layer)=>{const p=feature.properties||{},lines=[];const createdStr=fmtCreated(p.createdAt); if(createdStr)lines.push(`<span class="muted">Přidáno: ${createdStr}</span>`); if(feature.geometry.type==='Point'){const lbl=({warning:'pozor',speed_bump:'retardér',zavora:'závora',railcross:'přejezd',pin:'bod'}[p.pointIcon])||'bod';lines.unshift(`<b>${lbl}</b>`)}else{const left=[];if(p.surface)left.push(`<b>${p.surface}</b>`);if(p.quality)left.push(`<span style="color:${colorForQuality(p.quality)}">${p.quality}</span>`);if(left.length)lines.unshift(left.join(' · '))} if(p.tag)lines.push(`<i>${p.tag}</i>`);if(p.note)lines.push(String(p.note).replace(/</g,'&lt;')); if(isAdmin)lines.push('<br><b>Admin:</b> kliknutím vybereš pro smazání.'); if(lines.length)layer.bindPopup(lines.join('<br>')); layer.on('click',()=>selectDbFeature(row.id)); if(layer instanceof L.Polyline && !(layer instanceof L.Polygon)){layer.feature=feature;lineLayers.push(layer);setTimeout(()=>placeIconsForLine(layer),0)}}}).addTo(dbLayer);layerById.set(row.id,layer);if(fit){try{const bb=layer.getBounds();if(bb.isValid())map.fitBounds(bb.pad(.1))}catch{}}}
-async function loadRows(){const {data,error}=await supabaseClient.from('map_features').select('*').eq('status','approved').order('created_at',{ascending:false}); if(error){console.error(error);showBanner('Nepodařilo se načíst data ze Supabase.',true);return} iconsLayer.clearLayers();dbLayer.clearLayers();lineLayers.length=0;layerById.clear();data.forEach(r=>addRow(r)); try{const bb=dbLayer.getBounds();if(bb.isValid())map.fitBounds(bb.pad(.1))}catch{} showBanner(`Načteno ${data.length} záznamů ✔`)}
-deleteSelectedBtn.onclick=async()=>{if(!isAdmin||!selectedFeatureId)return;if(!confirm('Opravdu smazat vybraný bod/úsek?'))return;const id=selectedFeatureId;const {error}=await supabaseClient.from('map_features').delete().eq('id',id);if(error)return showBanner('Mazání selhalo – nejsi admin nebo RLS blokuje akci.',true);selectedFeatureId=null;deleteSelectedBtn.disabled=true;removeRow(id);showBanner('Smazáno ✔')};
-function subscribeRealtime(){supabaseClient.channel('map_features_public').on('postgres_changes',{event:'*',schema:'public',table:'map_features'},payload=>{if(payload.eventType==='DELETE'){removeRow(payload.old.id);return}const row=payload.new;if(row.status==='approved')addRow(row);else removeRow(row.id)}).subscribe()}
-renderLegend();
-(async function startApp(){
-  const watchdog = setTimeout(() => {
-    const b = document.getElementById('banner');
-    if (b && b.textContent.includes('Načítám')) {
-      b.textContent = 'Načítání trvá moc dlouho – zkontroluj Network/Console, případně Supabase URL/key.';
-      b.className = 'error';
+
+  <div class="legend" id="legend">
+    <span class="chip">Legenda</span>
+    <div class="items" id="legItems"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <script>
+    // ====== Line icons (SVG snippets) ======
+    const ICON_SVGS = {
+      dot:   '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>',
+      brick: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="8" fill="#fff" stroke="#111" stroke-width="1"/><path d="M2 8 H14 M6 4 V8 M10 8 V12" stroke="#111" stroke-width="1"/></svg>',
+      pebble:'<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="8" r="2.4" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="6" r="1.9" fill="#fff" stroke="#111" stroke-width="1"/><circle cx="11" cy="11" r="1.5" fill="#fff" stroke="#111" stroke-width="1"/></svg>',
+      stairs:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 12 H12 V10 H10 V8 H8 V6 H6 V4 H4 Z" fill="#fff" stroke="#111" stroke-width="1.1"/></svg>',
+      plank: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 5 H14 M2 8 H14 M2 11 H14" stroke="#111" stroke-width="1.6"/></svg>',
+      triangle:'<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 3 L13 13 H3 Z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>'
+    };
+    const ICON_LABELS = { dot:'tečka (asfalt)', brick:'„cihla“', pebble:'štěrk', stairs:'schody', plank:'„prkna“', triangle:'trojúhelník/hlína' };
+
+    // ====== POINT ICONS ======
+    const POINT_ICONS = [
+      { key:'warning', label:'pozor', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 3L2.5 20h19L12 3z" fill="white" stroke="currentColor" stroke-width="2"/><path d="M12 8v6M12 18h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' },
+      { key:'speed_bump', label:'retardér', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="9" fill="white" stroke="currentColor" stroke-width="2"/><path d="M6 14c2-3 10-3 12 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="14" x2="19" y2="14" stroke="currentColor" stroke-width="2"/></svg>'},
+      { key:'zavora', label:'závora', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><rect x="4" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="17" y="15" width="3" height="6" fill="white" stroke="currentColor" stroke-width="2"/><rect x="5" y="9" width="14" height="4" rx="1" fill="white" stroke="currentColor" stroke-width="2"/><path d="M6 9.5 L9 12.5 M9 9.5 L12 12.5 M12 9.5 L15 12.5 M15 9.5 L18 12.5" stroke="currentColor" stroke-width="2"/></svg>' },
+      { key:'railcross', label:'přejezd', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 5 L19 19" stroke="white" stroke-width="6" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M5 5 L19 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19 5 L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>' },
+      { key:'pin', label:'bod', svg:'<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 22s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z" fill="white" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></svg>' }
+    ];
+
+    let surfaces = JSON.parse(localStorage.getItem('surfaces_icons_v6')||'null') || [
+      {name:'asfalt', icon:'dot', repeat:28},
+      {name:'dlažba / kostky', icon:'brick', repeat:28},
+      {name:'štěrk / prach', icon:'pebble', repeat:28},
+      {name:'schody', icon:'stairs', repeat:32},
+      {name:'dřevo / lávka', icon:'plank', repeat:32},
+      {name:'hlína', icon:'triangle', repeat:30}
+    ];
+    function saveSurfaces(){ localStorage.setItem('surfaces_icons_v6', JSON.stringify(surfaces)); }
+
+    let qualities = JSON.parse(localStorage.getItem('qualities_v2')||'null') || [
+      {name:'hladký', color:'#22c55e'},
+      {name:'ok', color:'#f59e0b'},
+      {name:'výtluky', color:'#ef4444'},
+      {name:'nebezpečí', color:'#111827'}
+    ];
+    function saveQualities(){ localStorage.setItem('qualities_v2', JSON.stringify(qualities)); }
+    function colorForQuality(qname){ const q = qualities.find(q => q.name === qname); return q ? q.color : '#38bdf8'; }
+
+    // UI refs
+    const geomTypeEl = document.getElementById('geomType');
+    const surfaceSel = document.getElementById('surfaceSelect');
+    const qualityEl = document.getElementById('quality');
+    const widthEl = document.getElementById('width');
+    const tagEl = document.getElementById('tag');
+    const noteEl = document.getElementById('note');
+    const pointIconEl = document.getElementById('pointIcon');
+    const pointSizeEl = document.getElementById('pointSize');
+    const createdAtGlobalEl = document.getElementById('createdAtGlobal');
+
+    function renderSurfaceSelect(){
+      surfaceSel.innerHTML='';
+      surfaces.forEach((s,i)=>{
+        const o=document.createElement('option'); o.value=String(i); o.textContent=s.name+' • '+(ICON_LABELS[s.icon]||s.icon); surfaceSel.appendChild(o);
+      });
     }
-  }, 10000);
-  try {
-    showBanner('Připojuji se k Supabase…');
-    await refreshSession();
-    showBanner('Načítám záznamy z databáze…');
-    await loadRows();
-    subscribeRealtime();
-  } catch (err) {
-    console.error('Start aplikace selhal:', err);
-    showBanner('Chyba startu aplikace: ' + (err?.message || err), true);
-  } finally {
-    clearTimeout(watchdog);
-  }
-})();
-</script>
+    function renderQualitySelect(){
+      qualityEl.innerHTML=''; qualities.forEach(q=>{
+        const o=document.createElement('option'); o.value=q.name; o.textContent=q.name; o.style.background=q.color; qualityEl.appendChild(o);
+      });
+    }
+    function renderPointIconSelect(){
+      pointIconEl.innerHTML=''; POINT_ICONS.forEach(pi=>{
+        const o=document.createElement('option'); o.value=pi.key; o.textContent=pi.label; pointIconEl.appendChild(o);
+      });
+    }
+    renderSurfaceSelect(); renderQualitySelect(); renderPointIconSelect();
+
+    function refreshControlStates(){
+      const isPoint = geomTypeEl.value === 'Point';
+      qualityEl.disabled = isPoint; widthEl.disabled = isPoint;
+    }
+    geomTypeEl.addEventListener('change', refreshControlStates); refreshControlStates();
+
+    // Managers
+    const managerSurf = document.getElementById('surfaceManager');
+    const managerQual = document.getElementById('qualityManager');
+    document.getElementById('manageSurfaces').onclick = ()=>{ managerSurf.style.display = managerSurf.style.display==='none' ? 'block' : 'none'; renderSurfaceList(); };
+    document.getElementById('manageQualities').onclick = ()=>{ managerQual.style.display = managerQual.style.display==='none' ? 'block' : 'none'; renderQualityList(); };
+
+    const newSurfaceName = document.getElementById('newSurfaceName');
+    const newSurfaceIcon = document.getElementById('newSurfaceIcon');
+    const newRepeat = document.getElementById('newRepeat');
+    const addSurfaceBtn = document.getElementById('addSurface');
+    const surfaceList = document.getElementById('surfaceList');
+
+    function renderIconOptions(sel){
+      sel.innerHTML=''; Object.keys(ICON_SVGS).forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=ICON_LABELS[k]||k; sel.appendChild(o); });
+    }
+    renderIconOptions(newSurfaceIcon);
+
+    function renderSurfaceList(){
+      surfaceList.innerHTML='';
+      surfaces.forEach((s,idx)=>{
+        const row=document.createElement('div'); row.className='row'; row.style.justifyContent='space-between'; row.style.border='1px solid var(--border)'; row.style.borderRadius='12px'; row.style.padding='8px';
+        const left=document.createElement('div'); left.style.display='flex'; left.style.alignItems='center'; left.style.gap='8px';
+        const iconbox=document.createElement('div'); iconbox.className='iconbox'; iconbox.innerHTML=ICON_SVGS[s.icon]||ICON_SVGS.dot;
+        const name=document.createElement('input'); name.type='text'; name.value=s.name; name.className='readonly'; name.style.borderStyle='solid';
+        name.addEventListener('change', ()=>{ s.name=name.value; saveSurfaces(); renderSurfaceSelect(); renderLegend(); });
+        left.appendChild(iconbox); left.appendChild(name);
+        const right=document.createElement('div'); right.className='row';
+        const iconSel=document.createElement('select'); renderIconOptions(iconSel); iconSel.value=s.icon;
+        iconSel.addEventListener('change', ()=>{ s.icon=iconSel.value; saveSurfaces(); renderSurfaceSelect(); renderLegend(); renderSurfaceList(); updateAllIcons(); });
+        const rep=document.createElement('input'); rep.type='number'; rep.min='8'; rep.max='80'; rep.value=s.repeat||28; rep.style.width='90px'; rep.addEventListener('change', ()=>{ s.repeat=Number(rep.value||28); saveSurfaces(); updateAllIcons(); });
+        const del=document.createElement('button'); del.className='btn'; del.textContent='Smazat'; del.addEventListener('click', ()=>{ surfaces.splice(idx,1); saveSurfaces(); renderSurfaceSelect(); renderLegend(); renderSurfaceList(); updateAllIcons(); });
+        right.appendChild(iconSel); right.appendChild(rep); right.appendChild(del);
+        row.appendChild(left); row.appendChild(right); surfaceList.appendChild(row);
+      });
+    }
+    addSurfaceBtn.addEventListener('click', ()=>{ const n=(newSurfaceName.value||'').trim(); if(!n) return; surfaces.push({name:n, icon:newSurfaceIcon.value||'dot', repeat:Number(newRepeat.value||28)}); saveSurfaces(); newSurfaceName.value=''; renderSurfaceSelect(); renderLegend(); renderSurfaceList(); });
+
+    // Quality manager
+    const newQualityName = document.getElementById('newQualityName');
+    const newQualityColor = document.getElementById('newQualityColor');
+    const addQualityBtn = document.getElementById('addQuality');
+    const qualityList = document.getElementById('qualityList');
+    function renderQualityList(){
+      qualityList.innerHTML='';
+      qualities.forEach((q,idx)=>{
+        const row=document.createElement('div'); row.className='row'; row.style.justifyContent='space-between'; row.style.border='1px solid var(--border)'; row.style.borderRadius='12px'; row.style.padding='8px';
+        const left=document.createElement('div'); left.className='row'; left.style.gap='8px';
+        const name=document.createElement('input'); name.type='text'; name.value=q.name; name.className='readonly'; name.style.borderStyle='solid';
+        const color=document.createElement('input'); color.type='color'; color.value=q.color; color.style.width='70px'; color.style.height='42px'; color.style.borderRadius='10px'; color.style.border='1px solid var(--border)';
+        left.appendChild(name); left.appendChild(color);
+        const right=document.createElement('div'); right.className='row';
+        const del=document.createElement('button'); del.className='btn'; del.textContent='Smazat'; del.addEventListener('click', ()=>{ qualities.splice(idx,1); saveQualities(); renderQualitySelect(); renderLegend(); renderQualityList(); updateAllColors(); });
+        right.appendChild(del);
+        name.addEventListener('change', ()=>{ q.name=name.value; saveQualities(); renderQualitySelect(); renderLegend(); updateAllColors(); });
+        color.addEventListener('change', ()=>{ q.color=color.value; saveQualities(); renderQualitySelect(); renderLegend(); updateAllColors(); });
+        row.appendChild(left); row.appendChild(right); qualityList.appendChild(row);
+      });
+    }
+    addQualityBtn.addEventListener('click', ()=>{ const n=(newQualityName.value||'').trim(); if(!n) return; qualities.push({name:n, color:newQualityColor.value||'#22c55e'}); saveQualities(); newQualityName.value=''; renderQualitySelect(); renderLegend(); renderQualityList(); });
+
+    // ===== Map init (PERF) =====
+    const map = L.map('map', { preferCanvas:true }).setView([50.0755,14.4378], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      maxZoom:20, updateWhenIdle:true, updateWhenZooming:false, keepBuffer:2,
+      attribution:'&copy; OpenStreetMap přispěvatelé'
+    }).addTo(map);
+
+    const drawnItems = new L.FeatureGroup();
+    const iconsLayer = new L.FeatureGroup();
+    map.addLayer(drawnItems); map.addLayer(iconsLayer);
+
+    const drawControl = new L.Control.Draw({
+      draw: { polyline:true, polygon:false, rectangle:false, circle:false, circlemarker:false, marker:true },
+      edit: { featureGroup: drawnItems, edit:true, remove:true }
+    });
+    map.addControl(drawControl);
+
+    // Time helpers
+    function nowISO(){ return new Date().toISOString(); }
+    function toLocalInputValue(iso){ try{ const d = iso ? new Date(iso) : new Date(); const pad = (n)=> String(n).padStart(2,'0'); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes()); }catch(e){ return ''; } }
+    function fromLocalInputValue(val){ if(!val) return null; try{ const d = new Date(val); return d.toISOString(); }catch(e){ return null; } }
+
+    // Drawing
+    let activeDraw=null;
+    function chosenCreatedAtISO(){ const v = (createdAtGlobalEl.value||'').trim(); const given = fromLocalInputValue(v); return given || nowISO(); }
+    function enableDraw(){
+      if(activeDraw) activeDraw.disable();
+      const type=geomTypeEl.value; const color=colorForQuality(qualityEl.value); const weight=Number(widthEl.value||6);
+      if(type==='LineString') activeDraw = new L.Draw.Polyline(map, { shapeOptions: { color, weight, opacity:0.95 } });
+      else activeDraw = new L.Draw.Marker(map, { repeatMode:false, icon: L.divIcon({ className:'', html:'<div style="width:12px;height:12px;border-radius:50%;background:#ef4444"></div>', iconSize:[12,12], iconAnchor:[6,6] }) });
+      activeDraw.enable();
+    }
+    document.getElementById('startDraw').onclick = enableDraw;
+    document.getElementById('stopDraw').onclick = ()=>{ if(activeDraw) { activeDraw.disable(); activeDraw=null; } };
+
+    function currentSurface(){ const idx=Number(surfaceSel.value||0); return surfaces[idx]||surfaces[0]; }
+    function lineIcon(key){ const html=ICON_SVGS[key]||ICON_SVGS.dot; return L.divIcon({ html, className:'', iconSize:[16,16], iconAnchor:[8,8] }); }
+
+    // ===== PERF config for line icons =====
+    const PERF = {
+      MAX_ICONS_PER_LINE: 400,    // horní limit na čáru
+      MAX_ICONS_TOTAL: 2000,      // globální horní limit
+      MIN_REPEAT: 16,             // nikdy netvořit hustěji než 16 px
+    };
+    let scheduledIconUpdate = null;
+    let lastIconZoom = map.getZoom();
+
+    function clearLineIcons(lineLayer){
+      if(lineLayer._iconMarkers){ lineLayer._iconMarkers.forEach(m=>iconsLayer.removeLayer(m)); lineLayer._iconMarkers=null; }
+    }
+
+    function placeIconsForLine(lineLayer){
+      // Adaptivní a limitované ukládání ikon – přepočítáváme jen na změnu zoomu nebo po editaci
+      clearLineIcons(lineLayer);
+
+      const f=lineLayer.feature||lineLayer.toGeoJSON(); const p=f.properties||{};
+      const surf=surfaces.find(s=>s.name===p.surface)||currentSurface();
+      const baseRepeat=Math.max(8, Number(surf.repeat||28));
+      const latlngs=lineLayer.getLatLngs(); if(!Array.isArray(latlngs)||latlngs.length<2) return;
+      const pts=latlngs.flat ? latlngs.flat() : latlngs;
+
+      const pix=pts.map(ll=>map.latLngToLayerPoint(ll));
+      let segLens=[]; let total=0;
+      for(let i=0;i<pix.length-1;i++){
+        const dx=pix[i+1].x-pix[i].x, dy=pix[i+1].y-pix[i].y;
+        const segLen=Math.hypot(dx,dy); segLens.push(segLen); total+=segLen;
+      }
+      if(total<4) return;
+
+      // Adaptivní ředění podle délky a globálních limitů
+      let repeat = Math.max(PERF.MIN_REPEAT, baseRepeat);
+      let estimated = Math.floor(total / repeat) + 1;
+      // Omez počet ikon na čáru
+      if(estimated > PERF.MAX_ICONS_PER_LINE){
+        repeat = Math.ceil(total / PERF.MAX_ICONS_PER_LINE);
+        estimated = Math.floor(total / repeat) + 1;
+      }
+
+      // Omez i globálně (přes všechny čáry)
+      const currentTotal = Object.values(drawnItems._layers || {}).reduce((acc, l)=>{
+        if(l instanceof L.Polyline && !(l instanceof L.Polygon)) return acc + (l._iconMarkers ? l._iconMarkers.length : 0);
+        return acc;
+      }, 0);
+      if(currentTotal + estimated > PERF.MAX_ICONS_TOTAL){
+        const allowed = Math.max(1, PERF.MAX_ICONS_TOTAL - currentTotal);
+        repeat = Math.ceil(total / allowed);
+      }
+
+      const icon=lineIcon(surf.icon);
+      const markers=[];
+      for(let d=0; d<=total; d+=repeat){
+        let acc=0, k=-1;
+        for(let i=0;i<segLens.length;i++){ if(acc+segLens[i]>=d){k=i;break} acc+=segLens[i]; }
+        if(k<0) continue;
+        const A=pix[k], B=pix[k+1], segLen=segLens[k], t=segLen? (d-acc)/segLen : 0;
+        const x=A.x+(B.x-A.x)*t, y=A.y+(B.y-A.y)*t; const ll=map.layerPointToLatLng(L.point(x,y));
+        const m=L.marker(ll, { icon, interactive:false, keyboard:false, pane:'markerPane' });
+        iconsLayer.addLayer(m); markers.push(m);
+      }
+      lineLayer._iconMarkers=markers;
+    }
+
+    function updateAllIcons(force=false){
+      // Přepočítej jen když se změnil zoom nebo požadujeme "force" (po editaci/importu)
+      const z = map.getZoom();
+      if(!force && z === lastIconZoom) return;
+      lastIconZoom = z;
+      iconsLayer.clearLayers();
+      drawnItems.eachLayer(l=>{ if(l instanceof L.Polyline && !(l instanceof L.Polygon)) placeIconsForLine(l); });
+    }
+
+    // Throttle přes rAF
+    function scheduleIconUpdate(force=false){
+      if(scheduledIconUpdate) return;
+      scheduledIconUpdate = requestAnimationFrame(()=>{ scheduledIconUpdate = null; updateAllIcons(force); });
+    }
+
+    // Přepočet POUZE na zoom (při posunu ne)
+    map.on('zoomend', ()=> scheduleIconUpdate(false));
+
+    // Point icon helper (all red)
+    function pointDivIcon(p){
+      const size=Math.max(16, Math.min(48, Number(p.pointSize||24))), color='#ef4444';
+      const meta = POINT_ICONS.find(x=>x.key === (p.pointIcon||'warning')) || POINT_ICONS[0];
+      const html = `<div class="pticon" style="width:${size}px;height:${size}px;color:${color}">${meta.svg}</div>`;
+      return L.divIcon({ html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2] });
+    }
+
+    function styleFor(feature){
+      const p=feature.properties||{};
+      if(feature.geometry && feature.geometry.type==='Point') return {};
+      const color=p.color || colorForQuality(p.quality);
+      const width=Number(p.width||6);
+      return { color, weight: width, opacity:0.95 };
+    }
+    function featureToLayer(f){
+      return L.geoJSON(f, { style: styleFor, pointToLayer: (feat,latlng)=> { const p=feat.properties||{}; return L.marker(latlng, { icon: pointDivIcon(p) }); } });
+    }
+    function ensureFeature(layer){ if(!layer.feature) layer.feature=layer.toGeoJSON(); if(!layer.feature.properties) layer.feature.properties={}; return layer.feature; }
+
+    function bindLinePopup(layer){
+      const feat=ensureFeature(layer); const p=feat.properties;
+      const createdISO = p.createdAt || chosenCreatedAtISO();
+      const surfOpts=surfaces.map(s=>`<option ${s.name===p.surface?'selected':''}>${s.name}</option>`).join('');
+      const qualOpts=qualities.map(q=>`<option ${q.name===p.quality?'selected':''}>${q.name}</option>`).join('');
+      const html=`<div style="min-width:300px">
+        <div class="muted" style="margin-bottom:6px">Úprava <b>linie</b></div>
+        <label class="muted">Vytvořeno</label>
+        <input type="datetime-local" id="pp_createdLocal" value="${toLocalInputValue(createdISO)}"/>
+        <label class="muted" style="margin-top:8px">Povrch</label><select id="pp_surface">${surfOpts}</select>
+        <label class="muted" style="margin-top:8px">Kvalita</label><select id="pp_quality">${qualOpts}</select>
+        <div class="row" style="margin-top:6px;gap:6px">
+          <div style="flex:1"><label class="muted">Šířka</label><input id="pp_width" type="number" min="1" max="20" value="${Number(p.width||6)}"/></div>
+          <div style="flex:1"><label class="muted">Tag</label><input id="pp_tag" type="text" value="${(p.tag||'').replace(/\"/g,'&quot;')}"/></div>
+        </div>
+        <label class="muted" style="margin-top:8px">Poznámka</label><textarea id="pp_note" rows="2">${(p.note||'').replace(/</g,'&lt;')}</textarea>
+        <div class="row" style="margin-top:8px"><button id="pp_save" class="btn primary">Uložit</button></div>
+      </div>`;
+      layer.bindPopup(html);
+      layer.on('popupopen', (ev)=>{
+        const el=ev.popup.getElement();
+        el.querySelector('#pp_save').addEventListener('click', ()=>{
+          const createdLocal = el.querySelector('#pp_createdLocal').value;
+          const createdISO2 = fromLocalInputValue(createdLocal) || createdISO;
+          const surface=el.querySelector('#pp_surface').value;
+          const quality=el.querySelector('#pp_quality').value;
+          const width=Number(el.querySelector('#pp_width').value||6);
+          const tag=el.querySelector('#pp_tag').value;
+          const note=el.querySelector('#pp_note').value;
+          p.createdAt = createdISO2;
+          p.surface=surface; p.quality=quality; p.width=width; p.tag=tag; p.note=note; p.color=colorForQuality(quality); feat.properties=p;
+          if(layer.setStyle) layer.setStyle({ color:p.color, weight:width });
+          placeIconsForLine(layer);
+          layer.closePopup();
+        });
+      });
+    }
+
+    function bindPointPopup(layer){
+      const feat=ensureFeature(layer); const p=feat.properties;
+      const createdISO = p.createdAt || chosenCreatedAtISO();
+      const opts=POINT_ICONS.map(pi=>`<option value="${pi.key}" ${pi.key===(p.pointIcon||'warning')?'selected':''}>${pi.label}</option>`).join('');
+      const html=`<div style="min-width:280px">
+        <div class="muted" style="margin-bottom:6px">Úprava <b>bodu</b></div>
+        <label class="muted">Vytvořeno</label>
+        <input type="datetime-local" id="pp_createdLocal" value="${toLocalInputValue(createdISO)}"/>
+        <label class="muted">Piktogram</label><select id="pp_pticon">${opts}</select>
+        <label class="muted" style="margin-top:8px">Velikost</label><input id="pp_ptsize" type="number" min="16" max="48" value="${Number(p.pointSize||24)}" style="width:100%"/>
+        <div class="row" style="margin-top:6px;gap:6px"><div style="flex:1"><label class="muted">Tag</label><input id="pp_tag" type="text" value="${(p.tag||'').replace(/\"/g,'&quot;')}"/></div></div>
+        <label class="muted" style="margin-top:8px">Poznámka</label><textarea id="pp_note" rows="2">${(p.note||'').replace(/</g,'&lt;')}</textarea>
+        <div class="row" style="margin-top:8px"><button id="pp_save" class="btn primary">Uložit</button></div>
+      </div>`;
+      layer.bindPopup(html);
+      layer.on('popupopen', (ev)=>{
+        const el=ev.popup.getElement();
+        el.querySelector('#pp_save').addEventListener('click', ()=>{
+          const createdLocal = el.querySelector('#pp_createdLocal').value;
+          const createdISO2 = fromLocalInputValue(createdLocal) || createdISO;
+          const pticon=el.querySelector('#pp_pticon').value;
+          const ptsize=Number(el.querySelector('#pp_ptsize').value||24);
+          const tag=el.querySelector('#pp_tag').value;
+          const note=el.querySelector('#pp_note').value;
+          p.createdAt = createdISO2;
+          p.pointIcon=pticon; p.pointSize=ptsize; p.tag=tag; p.note=note; feat.properties=p; layer.setIcon(pointDivIcon(p)); layer.closePopup();
+        });
+      });
+    }
+
+    // Creation
+    map.on(L.Draw.Event.CREATED, function (e) {
+      const layer=e.layer;
+      const isMarker=layer instanceof L.Marker;
+      const feat=layer.toGeoJSON();
+      const createdAt = chosenCreatedAtISO();
+      const common={ tag:(tagEl.value||'').trim(), note:(noteEl.value||'').trim(), createdAt };
+      if(isMarker){
+        const props={ type:'Point', pointIcon: pointIconEl.value || 'warning', pointSize: Number(pointSizeEl.value||24), ...common };
+        feat.properties=props;
+      } else {
+        const props={ type:'LineString', surface:(surfaces[Number(surfaceSel.value||0)]||surfaces[0]).name, quality:qualityEl.value, color: colorForQuality(qualityEl.value), width:Number(widthEl.value||6), ...common };
+        feat.properties=props;
+      }
+      const styled=featureToLayer(feat);
+      styled.eachLayer(l=>{
+        l.feature=feat; drawnItems.addLayer(l);
+        if(l instanceof L.Polyline && !(l instanceof L.Polygon)){ placeIconsForLine(l); bindLinePopup(l); }
+        else if(l instanceof L.Marker){ bindPointPopup(l); }
+      });
+      if(activeDraw){ activeDraw.disable(); activeDraw=null; } // auto-exit draw mode
+      scheduleIconUpdate(true);
+    });
+
+    // Re-icon after edit/delete
+    map.on(L.Draw.Event.EDITED, function(e){
+      e.layers.eachLayer(l=>{ if(l instanceof L.Polyline && !(l instanceof L.Polygon)) placeIconsForLine(l); });
+      scheduleIconUpdate(true);
+    });
+    map.on(L.Draw.Event.DELETED, function(e){
+      e.layers.eachLayer(l=>{ if(l._iconMarkers) l._iconMarkers.forEach(m=>iconsLayer.removeLayer(m)); });
+      scheduleIconUpdate(true);
+    });
+
+    // Export / Import
+    document.getElementById('exportBtn').onclick = ()=>{
+      const features=[];
+      drawnItems.eachLayer(l=>{
+        const f=l.feature||l.toGeoJSON();
+        const p=f.properties=f.properties||{};
+        if(f.geometry.type==='Point'){
+          p['marker-size']=p['marker-size']||'small';
+          p.pointIcon = p.pointIcon || 'warning';
+          p.pointSize = Number(p.pointSize||24);
+        } else {
+          p['stroke']=p.color||colorForQuality(p.quality);
+          p['stroke-width']=Number(p.width||6);
+          p['stroke-opacity']= (typeof p['stroke-opacity']!=='undefined') ? p['stroke-opacity'] : 0.95;
+          const surf=surfaces.find(s=>s.name===p.surface);
+          if(surf){ p.surfaceIcon=surf.icon; p.surfaceRepeat=surf.repeat; }
+        }
+        features.push(f);
+      });
+      const pack={ type:'FeatureCollection', features, meta:{ surfaces, qualities, pointIcons: POINT_ICONS.map(x=>({key:x.key,label:x.label})) } };
+      const blob=new Blob([JSON.stringify(pack,null,2)],{type:'application/geo+json'});
+      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='mapdata.geojson'; a.click(); URL.revokeObjectURL(url);
+    };
+
+    document.getElementById('importBtn').onclick = ()=> document.getElementById('importInput').click();
+    document.getElementById('importInput').addEventListener('change', async (ev)=>{
+      const file=ev.target.files?.[0]; if(!file) return;
+      const text=await file.text();
+      const fc=JSON.parse(text);
+      if(fc.meta && Array.isArray(fc.meta.surfaces)){ surfaces=fc.meta.surfaces; saveSurfaces(); renderSurfaceSelect(); }
+      if(fc.meta && Array.isArray(fc.meta.qualities)){ qualities=fc.meta.qualities; saveQualities(); renderQualitySelect(); }
+      drawnItems.clearLayers(); iconsLayer.clearLayers();
+      (fc.features||[]).forEach(f=>{
+        f.properties = f.properties || {};
+        if(f.geometry && f.geometry.type==='LineString'){
+          f.properties.surface = f.properties.surface || (surfaces[0]&&surfaces[0].name) || 'asfalt';
+          f.properties.quality = f.properties.quality || (qualities[0]&&qualities[0].name) || 'hladký';
+          f.properties.width = Number(f.properties.width||6);
+          f.properties.color = f.properties.color || colorForQuality(f.properties.quality);
+        }
+        if(f.geometry && f.geometry.type==='Point'){
+          f.properties.pointIcon = f.properties.pointIcon || 'warning';
+          f.properties.pointSize = Number(f.properties.pointSize||24);
+        }
+        const lyr=featureToLayer(f);
+        lyr.eachLayer?.((l)=>{
+          l.feature=f; drawnItems.addLayer(l);
+          if(l instanceof L.Polyline && !(l instanceof L.Polygon)) { bindLinePopup(l); }
+          if(l instanceof L.Marker){ bindPointPopup(l); }
+        }) || (()=>{
+          const l=lyr; l.feature=f; drawnItems.addLayer(l);
+          if(l instanceof L.Polyline && !(l instanceof L.Polygon)) { bindLinePopup(l); }
+          if(l instanceof L.Marker){ bindPointPopup(l); }
+        })();
+      });
+      try{ const bb=drawnItems.getBounds(); if(bb.isValid()) map.fitBounds(bb.pad(0.1)); }catch{}
+      renderLegend();
+      scheduleIconUpdate(true);
+    });
+
+    function renderLegend(){
+      const wrap=document.getElementById('legItems'); wrap.innerHTML='';
+      // qualities
+      qualities.forEach(q=>{
+        const chip=document.createElement('div'); chip.className='chip';
+        const sw=document.createElement('span'); sw.className='sw'; sw.style.background=q.color;
+        chip.appendChild(sw);
+        chip.appendChild(Object.assign(document.createElement('span'),{textContent:q.name}));
+        wrap.appendChild(chip);
+      });
+      // surfaces
+      surfaces.forEach(s=>{
+        const chip=document.createElement('div'); chip.className='chip';
+        const iconbox=document.createElement('span'); iconbox.className='iconbox'; iconbox.innerHTML=ICON_SVGS[s.icon]||ICON_SVGS.dot;
+        chip.appendChild(iconbox);
+        chip.appendChild(Object.assign(document.createElement('span'),{textContent:s.name}));
+        wrap.appendChild(chip);
+      });
+      // point icons
+      POINT_ICONS.forEach(pi=>{
+        const chip=document.createElement('div'); chip.className='chip';
+        const size=18; const html=`<div class="pticon" style="width:${size}px;height:${size}px;color:#ef4444">${pi.svg}</div>`;
+        const box=document.createElement('span'); box.className='iconbox'; box.innerHTML=html;
+        chip.appendChild(box);
+        chip.appendChild(Object.assign(document.createElement('span'),{textContent:pi.label}));
+        wrap.appendChild(chip);
+      });
+    }
+    renderLegend();
+
+    function updateAllColors(){
+      drawnItems.eachLayer(l => {
+        if(!l.feature) return;
+        const p = l.feature.properties||{};
+        if(l instanceof L.Marker){ l.setIcon(pointDivIcon(p)); }
+        else if (l.setStyle){ p.color = colorForQuality(p.quality); l.setStyle({ color: p.color, weight: Number(p.width||6) }); }
+      });
+      scheduleIconUpdate(true);
+    }
+  </script>
 </body>
 </html>
