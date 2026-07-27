@@ -932,7 +932,7 @@ async function loadAdmin() {
   if (oe) throw oe;
 
   el("userList").innerHTML = (profiles || []).map(p => {
-    const userFeatures = state.features.filter(f => f.owner_id === p.id);
+    const userFeatures = [...state.features.values()].filter(f => f.owner_id === p.id);
     const lineCount = userFeatures.filter(f => f.kind === "line").length;
     const pointCount = userFeatures.filter(f => f.kind !== "line").length;
     return `<div class="user-card">
