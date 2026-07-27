@@ -92,10 +92,13 @@
     .chip{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:#102138;border:1px solid var(--line);font-size:11px}
     .swatch{width:18px;height:5px;border-radius:999px}
     .surface-swatch{
-      width:30px;height:9px;border-radius:999px;background:#8fa4b8;position:relative;overflow:hidden;
-      box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)
+      width:34px;height:14px;display:grid;place-items:center;position:relative;
     }
-    .surface-swatch::after{content:"";position:absolute;inset:0;background:var(--surface-pattern,none)}
+    .surface-swatch::before{content:"";position:absolute;left:0;right:0;top:6px;height:3px;border-radius:3px;background:#8fa4b8}
+    .surface-swatch svg{position:relative;z-index:1;width:18px;height:14px;overflow:visible;filter:drop-shadow(0 1px 1px rgba(0,0,0,.65))}
+    .surface-symbol-marker{background:transparent!important;border:0!important;pointer-events:none!important}
+    .surface-symbol{width:20px;height:20px;display:grid;place-items:center;transform-origin:center;color:#111827}
+    .surface-symbol svg{width:18px;height:18px;overflow:visible;filter:drop-shadow(0 1px 1px rgba(255,255,255,.85)) drop-shadow(0 1px 1px rgba(0,0,0,.7))}
     .marker-preview{width:20px;height:20px;display:grid;place-items:center}
 
     .modal-backdrop{
@@ -356,6 +359,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
@@ -378,6 +382,7 @@ const state = {
   profile: null,
   features: new Map(),
   layers: new Map(),
+  symbolLayers: new Map(),
   options: { surface: [], quality: [], warning: [] },
   activeDraw: null,
   pendingLayer: null,
@@ -407,6 +412,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 const lineRenderer = L.canvas({ padding: 0.35, tolerance: 7 });
 const featureLayer = L.featureGroup().addTo(map);
+const surfaceSymbolLayer = L.layerGroup().addTo(map);
 
 function toast(message, type = "") {
   const n = document.createElement("div");
@@ -468,56 +474,66 @@ function markerIcon(option) {
   return L.divIcon({ className: "warning-marker", html, iconSize: [34,34], iconAnchor: [17,17], popupAnchor: [0,-16] });
 }
 
-function surfacePattern(surfaceLabel = "") {
+function surfaceKey(surfaceLabel = "") {
   const value = surfaceLabel.toLocaleLowerCase("cs-CZ");
-
-  // Vzor je součástí samotné linie, takže zůstává rychlý i při velkém přiblížení.
-  if (value.includes("dlaž") || value.includes("kost")) {
-    return { dashArray: "4 4", lineCap: "butt", key: "paving" };
-  }
-  if (value.includes("štěrk") || value.includes("prach") || value.includes("šotol")) {
-    return { dashArray: "1 7", lineCap: "round", key: "gravel" };
-  }
-  if (value.includes("hlín") || value.includes("zem")) {
-    return { dashArray: "11 6", lineCap: "round", key: "dirt" };
-  }
-  if (value.includes("dřev") || value.includes("láv")) {
-    return { dashArray: "3 3 12 3", lineCap: "butt", key: "wood" };
-  }
-  if (value.includes("beton")) {
-    return { dashArray: "16 5 3 5", lineCap: "butt", key: "concrete" };
-  }
-  if (value.includes("tráv") || value.includes("grass")) {
-    return { dashArray: "2 5", lineCap: "round", key: "grass" };
-  }
-  return { dashArray: null, lineCap: "round", key: "asphalt" };
+  if (value.includes("dlaž") || value.includes("kost")) return "paving";
+  if (value.includes("štěrk") || value.includes("prach") || value.includes("šotol")) return "gravel";
+  if (value.includes("schod")) return "stairs";
+  if (value.includes("dřev") || value.includes("láv")) return "wood";
+  if (value.includes("beton") || value.includes("panel")) return "concrete";
+  if (value.includes("tráv") || value.includes("grass") || value.includes("terén")) return "grass";
+  if (value.includes("hlín") || value.includes("zem")) return "dirt";
+  return "asphalt";
 }
 
-function surfaceLegendPattern(surfaceLabel = "") {
-  const { key } = surfacePattern(surfaceLabel);
-  const patterns = {
-    asphalt: "none",
-    paving: "repeating-linear-gradient(90deg, transparent 0 4px, rgba(7,17,31,.92) 4px 7px)",
-    gravel: "radial-gradient(circle at 3px 50%, rgba(7,17,31,.95) 0 1.4px, transparent 1.6px)",
-    dirt: "repeating-linear-gradient(90deg, transparent 0 9px, rgba(7,17,31,.9) 9px 14px)",
-    wood: "repeating-linear-gradient(90deg, transparent 0 3px, rgba(7,17,31,.95) 3px 5px, transparent 5px 14px, rgba(7,17,31,.95) 14px 16px)",
-    concrete: "repeating-linear-gradient(90deg, transparent 0 13px, rgba(7,17,31,.92) 13px 17px, transparent 17px 20px, rgba(7,17,31,.92) 20px 22px)",
-    grass: "radial-gradient(ellipse at 3px 50%, rgba(7,17,31,.95) 0 1.2px, transparent 1.4px)"
+function surfaceSymbolSvg(surfaceLabel = "") {
+  const key = surfaceKey(surfaceLabel);
+  const common = 'viewBox="0 0 24 24" fill="white" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  const icons = {
+    asphalt: `<svg ${common}><circle cx="12" cy="12" r="4.2"/></svg>`,
+    paving: `<svg ${common}><rect x="3" y="6" width="8" height="5" rx=".7"/><rect x="13" y="6" width="8" height="5" rx=".7"/><rect x="8" y="13" width="8" height="5" rx=".7"/></svg>`,
+    gravel: `<svg ${common}><circle cx="6" cy="12" r="2.2"/><circle cx="12" cy="8" r="2.2"/><circle cx="18" cy="13" r="2.2"/></svg>`,
+    dirt: `<svg ${common}><path d="M4 16c3-7 6 4 9-3s5 2 7-3"/><circle cx="7" cy="7" r="1.3"/></svg>`,
+    wood: `<svg ${common}><rect x="3" y="6" width="18" height="12" rx="1"/><path d="M8 6v12M13 6v12M18 6v12"/></svg>`,
+    concrete: `<svg ${common}><rect x="3" y="6" width="18" height="12" rx="1"/><path d="M12 6v12M3 12h18"/></svg>`,
+    stairs: `<svg ${common}><path d="M3 18h5v-4h5v-4h5V6h3" fill="none"/></svg>`,
+    grass: `<svg ${common}><path d="M12 19V7M12 14 7 9M12 15l5-6M7 19h10" fill="none"/></svg>`
   };
-  return patterns[key] || "none";
+  return icons[key] || icons.asphalt;
+}
+
+function surfaceSymbolIcon(surfaceLabel = "") {
+  return L.divIcon({
+    className: "surface-symbol-marker",
+    html: `<div class="surface-symbol">${surfaceSymbolSvg(surfaceLabel)}</div>`,
+    iconSize: [20,20],
+    iconAnchor: [10,10]
+  });
+}
+
+function createSurfaceSymbols(polyline, feature) {
+  if (!window.L.polylineDecorator) return null;
+  const surface = optionById("surface", feature.surface_option_id)?.label || "Asfalt";
+  return L.polylineDecorator(polyline, {
+    patterns: [{
+      offset: 18,
+      repeat: 62,
+      symbol: L.Symbol.marker({
+        rotate: true,
+        markerOptions: { icon: surfaceSymbolIcon(surface), interactive: false, keyboard: false }
+      })
+    }]
+  });
 }
 
 function lineStyle(feature) {
   const quality = optionById("quality", feature.quality_option_id);
-  const surface = optionById("surface", feature.surface_option_id);
-  const pattern = surfacePattern(surface?.label || "");
   return {
     renderer: lineRenderer,
     color: quality?.color || "#3aa7ff",
     weight: 7,
     opacity: .92,
-    dashArray: pattern.dashArray,
-    lineCap: pattern.lineCap,
+    lineCap: "round",
     lineJoin: "round"
   };
 }
@@ -562,7 +578,10 @@ function geometryToLayer(feature) {
 function removeFeatureLayer(id) {
   const old = state.layers.get(id);
   if (old) featureLayer.removeLayer(old);
+  const symbols = state.symbolLayers.get(id);
+  if (symbols) surfaceSymbolLayer.removeLayer(symbols);
   state.layers.delete(id);
+  state.symbolLayers.delete(id);
 }
 
 function upsertFeatureLayer(feature) {
@@ -571,6 +590,13 @@ function upsertFeatureLayer(feature) {
   const layer = geometryToLayer(feature);
   featureLayer.addLayer(layer);
   state.layers.set(feature.id, layer);
+  if (feature.kind === "line") {
+    const symbols = createSurfaceSymbols(layer, feature);
+    if (symbols) {
+      surfaceSymbolLayer.addLayer(symbols);
+      state.symbolLayers.set(feature.id, symbols);
+    }
+  }
 }
 
 function deleteFeatureLocal(id) {
@@ -619,8 +645,7 @@ function renderLegend() {
     items.push(`<div class="chip" title="Kvalita povrchu"><span class="swatch" style="background:${q.color || "#3aa7ff"}"></span>${escapeHtml(q.label)}</div>`);
   }
   for (const s of state.options.surface) {
-    const pattern = surfaceLegendPattern(s.label).replace(/"/g, "&quot;");
-    items.push(`<div class="chip" title="Typ povrchu"><span class="surface-swatch" style="--surface-pattern:${pattern}"></span>${escapeHtml(s.label)}</div>`);
+    items.push(`<div class="chip" title="Typ povrchu"><span class="surface-swatch">${surfaceSymbolSvg(s.label)}</span>${escapeHtml(s.label)}</div>`);
   }
   for (const w of state.options.warning) {
     items.push(`<div class="chip" title="Výstraha"><span class="marker-preview">${warningSvg(w.icon)}</span>${escapeHtml(w.label)}</div>`);
