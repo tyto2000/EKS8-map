@@ -349,8 +349,8 @@
    Project Settings → API → Project URL + anon public key
    Nikdy sem nevkládej service_role key.
 ============================================================ */
-const SUPABASE_URL = "DOPLN_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "DOPLN_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://sjmylzrhqrwoggowimtq.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "sb_publishable_F3RaL5kYzaJY8iHzLxRKpw_R3lJGLvf";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
