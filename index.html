@@ -275,6 +275,18 @@
         </div>
         <div id="optionList" style="margin-top:10px"></div>
       </div>
+      <div class="section">
+        <h3>GeoJSON podklad / data mapy</h3>
+        <div class="row wrap">
+          <button id="importGeoJsonBtn" class="btn small">⬆ Nahrát GeoJSON</button>
+          <button id="exportGeoJsonBtn" class="btn small primary">⬇ Exportovat GeoJSON</button>
+          <input id="geoJsonFileInput" class="hidden" type="file" accept=".geojson,.json,application/geo+json,application/json">
+        </div>
+        <div class="muted" style="margin-top:8px">
+          Import podporuje <b>LineString</b>, <b>MultiLineString</b> a <b>Point</b>. Linie se uloží jako úseky, body jako výstrahy a změny se ihned propíšou do online mapy.
+        </div>
+        <div id="geoJsonStatus" class="muted" style="margin-top:8px"></div>
+      </div>
     </div>
   </aside>
 
@@ -976,6 +988,164 @@ el("optionForm").addEventListener("submit", async e => {
   } catch (error) { toast(error.message, "error"); }
 });
 
+
+function normalizeText(value) {
+  return String(value ?? "").trim().toLocaleLowerCase("cs-CZ");
+}
+
+function findOptionId(kind, properties, keys) {
+  for (const key of keys) {
+    const raw = properties?.[key];
+    if (!raw) continue;
+    const byId = state.options[kind].find(o => o.id === raw);
+    if (byId) return byId.id;
+    const wanted = normalizeText(raw);
+    const byLabel = state.options[kind].find(o => normalizeText(o.label) === wanted);
+    if (byLabel) return byLabel.id;
+  }
+  return state.options[kind][0]?.id || null;
+}
+
+function featureToGeoJson(feature) {
+  const surface = optionById("surface", feature.surface_option_id);
+  const quality = optionById("quality", feature.quality_option_id);
+  const warning = optionById("warning", feature.warning_option_id);
+  return {
+    type: "Feature",
+    id: feature.id,
+    geometry: feature.geometry,
+    properties: {
+      id: feature.id,
+      kind: feature.kind,
+      title: feature.title || null,
+      note: feature.note || null,
+      surface: surface?.label || null,
+      surface_option_id: feature.surface_option_id || null,
+      quality: quality?.label || null,
+      quality_option_id: feature.quality_option_id || null,
+      warning: warning?.label || null,
+      warning_option_id: feature.warning_option_id || null,
+      owner_id: feature.owner_id || null,
+      created_at: feature.created_at || null,
+      updated_at: feature.updated_at || null
+    }
+  };
+}
+
+function downloadGeoJson() {
+  if (!isAdmin()) return toast("Export je dostupný pouze správci.", "error");
+  const collection = {
+    type: "FeatureCollection",
+    name: "ESK8 mapa povrchů",
+    exported_at: new Date().toISOString(),
+    features: [...state.features.values()].map(featureToGeoJson)
+  };
+  const blob = new Blob([JSON.stringify(collection, null, 2)], { type: "application/geo+json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `esk8-mapa-${stamp}.geojson`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  el("geoJsonStatus").textContent = `Exportováno ${collection.features.length} prvků.`;
+  toast(`GeoJSON exportován (${collection.features.length} prvků).`, "success");
+}
+
+function geoJsonToRows(input) {
+  const sourceFeatures = input?.type === "FeatureCollection"
+    ? input.features
+    : input?.type === "Feature"
+      ? [input]
+      : input?.type && input?.coordinates
+        ? [{ type: "Feature", geometry: input, properties: {} }]
+        : null;
+
+  if (!Array.isArray(sourceFeatures)) throw new Error("Soubor není platný GeoJSON.");
+  if (sourceFeatures.length > 5000) throw new Error("Jeden import může obsahovat nejvýše 5 000 prvků.");
+
+  const rows = [];
+  let skipped = 0;
+  for (const item of sourceFeatures) {
+    const geometry = item?.geometry;
+    const props = item?.properties || {};
+    if (!geometry || !geometry.type || !geometry.coordinates) { skipped++; continue; }
+
+    const base = {
+      title: String(props.title ?? props.name ?? props.nazev ?? "").trim() || null,
+      note: String(props.note ?? props.description ?? props.popis ?? "").trim() || null,
+      is_deleted: false
+    };
+
+    if (geometry.type === "LineString" && Array.isArray(geometry.coordinates) && geometry.coordinates.length >= 2) {
+      rows.push({
+        ...base,
+        kind: "line",
+        geometry: { type: "LineString", coordinates: geometry.coordinates },
+        surface_option_id: findOptionId("surface", props, ["surface_option_id", "surface", "povrch", "surfaceType"]),
+        quality_option_id: findOptionId("quality", props, ["quality_option_id", "quality", "kvalita", "qualityType"]),
+        warning_option_id: null
+      });
+    } else if (geometry.type === "MultiLineString" && Array.isArray(geometry.coordinates)) {
+      for (const coordinates of geometry.coordinates) {
+        if (!Array.isArray(coordinates) || coordinates.length < 2) { skipped++; continue; }
+        rows.push({
+          ...base,
+          kind: "line",
+          geometry: { type: "LineString", coordinates },
+          surface_option_id: findOptionId("surface", props, ["surface_option_id", "surface", "povrch", "surfaceType"]),
+          quality_option_id: findOptionId("quality", props, ["quality_option_id", "quality", "kvalita", "qualityType"]),
+          warning_option_id: null
+        });
+      }
+    } else if (geometry.type === "Point" && Array.isArray(geometry.coordinates) && geometry.coordinates.length >= 2) {
+      rows.push({
+        ...base,
+        kind: "warning",
+        geometry: { type: "Point", coordinates: geometry.coordinates },
+        surface_option_id: null,
+        quality_option_id: null,
+        warning_option_id: findOptionId("warning", props, ["warning_option_id", "warning", "vystraha", "type"])
+      });
+    } else {
+      skipped++;
+    }
+  }
+  return { rows, skipped };
+}
+
+async function importGeoJsonFile(file) {
+  if (!isAdmin()) throw new Error("Import je dostupný pouze správci.");
+  if (!file) return;
+  if (file.size > 20 * 1024 * 1024) throw new Error("Soubor je příliš velký. Maximum je 20 MB.");
+
+  el("geoJsonStatus").textContent = "Načítám a kontroluji soubor…";
+  const input = JSON.parse(await file.text());
+  const { rows, skipped } = geoJsonToRows(input);
+  if (!rows.length) throw new Error("V souboru nejsou podporované linie ani body.");
+
+  const confirmed = confirm(`Importovat ${rows.length} prvků do online mapy?${skipped ? `\nPřeskočeno bude ${skipped} nepodporovaných prvků.` : ""}`);
+  if (!confirmed) {
+    el("geoJsonStatus").textContent = "Import zrušen.";
+    return;
+  }
+
+  let imported = 0;
+  for (let i = 0; i < rows.length; i += 200) {
+    const batch = rows.slice(i, i + 200);
+    el("geoJsonStatus").textContent = `Nahrávám ${Math.min(i + batch.length, rows.length)} / ${rows.length}…`;
+    const { error } = await sb.from("map_features").insert(batch);
+    if (error) throw error;
+    imported += batch.length;
+  }
+
+  await loadFeatures();
+  el("geoJsonStatus").textContent = `Hotovo: importováno ${imported} prvků${skipped ? `, přeskočeno ${skipped}` : ""}.`;
+  toast(`GeoJSON importován (${imported} prvků).`, "success");
+}
+
 /* UI */
 el("authBtn").addEventListener("click", async () => {
   if (state.session) {
@@ -995,6 +1165,20 @@ el("adminBtn").onclick = async () => {
 el("closeEditorBtn").onclick = closePanels;
 el("closeListBtn").onclick = closePanels;
 el("closeAdminBtn").onclick = closePanels;
+el("exportGeoJsonBtn").onclick = downloadGeoJson;
+el("importGeoJsonBtn").onclick = () => {
+  el("geoJsonFileInput").value = "";
+  el("geoJsonFileInput").click();
+};
+el("geoJsonFileInput").addEventListener("change", async event => {
+  try {
+    await importGeoJsonFile(event.target.files?.[0]);
+  } catch (error) {
+    console.error(error);
+    el("geoJsonStatus").textContent = error.message || "Import selhal.";
+    toast(error.message || "Import GeoJSON selhal.", "error");
+  }
+});
 el("drawLineBtn").onclick = () => startDrawing("line");
 el("drawMarkerBtn").onclick = () => startDrawing("warning");
 el("cancelDrawBtn").onclick = stopDrawing;
