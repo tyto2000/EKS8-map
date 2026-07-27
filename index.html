@@ -91,6 +91,11 @@
     }
     .chip{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:#102138;border:1px solid var(--line);font-size:11px}
     .swatch{width:18px;height:5px;border-radius:999px}
+    .surface-swatch{
+      width:30px;height:9px;border-radius:999px;background:#8fa4b8;position:relative;overflow:hidden;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)
+    }
+    .surface-swatch::after{content:"";position:absolute;inset:0;background:var(--surface-pattern,none)}
     .marker-preview{width:20px;height:20px;display:grid;place-items:center}
 
     .modal-backdrop{
@@ -451,14 +456,56 @@ function markerIcon(option) {
   return L.divIcon({ className: "warning-marker", html, iconSize: [34,34], iconAnchor: [17,17], popupAnchor: [0,-16] });
 }
 
+function surfacePattern(surfaceLabel = "") {
+  const value = surfaceLabel.toLocaleLowerCase("cs-CZ");
+
+  // Vzor je součástí samotné linie, takže zůstává rychlý i při velkém přiblížení.
+  if (value.includes("dlaž") || value.includes("kost")) {
+    return { dashArray: "4 4", lineCap: "butt", key: "paving" };
+  }
+  if (value.includes("štěrk") || value.includes("prach") || value.includes("šotol")) {
+    return { dashArray: "1 7", lineCap: "round", key: "gravel" };
+  }
+  if (value.includes("hlín") || value.includes("zem")) {
+    return { dashArray: "11 6", lineCap: "round", key: "dirt" };
+  }
+  if (value.includes("dřev") || value.includes("láv")) {
+    return { dashArray: "3 3 12 3", lineCap: "butt", key: "wood" };
+  }
+  if (value.includes("beton")) {
+    return { dashArray: "16 5 3 5", lineCap: "butt", key: "concrete" };
+  }
+  if (value.includes("tráv") || value.includes("grass")) {
+    return { dashArray: "2 5", lineCap: "round", key: "grass" };
+  }
+  return { dashArray: null, lineCap: "round", key: "asphalt" };
+}
+
+function surfaceLegendPattern(surfaceLabel = "") {
+  const { key } = surfacePattern(surfaceLabel);
+  const patterns = {
+    asphalt: "none",
+    paving: "repeating-linear-gradient(90deg, transparent 0 4px, rgba(7,17,31,.92) 4px 7px)",
+    gravel: "radial-gradient(circle at 3px 50%, rgba(7,17,31,.95) 0 1.4px, transparent 1.6px)",
+    dirt: "repeating-linear-gradient(90deg, transparent 0 9px, rgba(7,17,31,.9) 9px 14px)",
+    wood: "repeating-linear-gradient(90deg, transparent 0 3px, rgba(7,17,31,.95) 3px 5px, transparent 5px 14px, rgba(7,17,31,.95) 14px 16px)",
+    concrete: "repeating-linear-gradient(90deg, transparent 0 13px, rgba(7,17,31,.92) 13px 17px, transparent 17px 20px, rgba(7,17,31,.92) 20px 22px)",
+    grass: "radial-gradient(ellipse at 3px 50%, rgba(7,17,31,.95) 0 1.2px, transparent 1.4px)"
+  };
+  return patterns[key] || "none";
+}
+
 function lineStyle(feature) {
   const quality = optionById("quality", feature.quality_option_id);
+  const surface = optionById("surface", feature.surface_option_id);
+  const pattern = surfacePattern(surface?.label || "");
   return {
     renderer: lineRenderer,
     color: quality?.color || "#3aa7ff",
-    weight: 6,
-    opacity: .9,
-    lineCap: "round",
+    weight: 7,
+    opacity: .92,
+    dashArray: pattern.dashArray,
+    lineCap: pattern.lineCap,
     lineJoin: "round"
   };
 }
@@ -557,10 +604,14 @@ function fillOptionSelects() {
 function renderLegend() {
   const items = [];
   for (const q of state.options.quality) {
-    items.push(`<div class="chip"><span class="swatch" style="background:${q.color || "#3aa7ff"}"></span>${escapeHtml(q.label)}</div>`);
+    items.push(`<div class="chip" title="Kvalita povrchu"><span class="swatch" style="background:${q.color || "#3aa7ff"}"></span>${escapeHtml(q.label)}</div>`);
+  }
+  for (const s of state.options.surface) {
+    const pattern = surfaceLegendPattern(s.label).replace(/"/g, "&quot;");
+    items.push(`<div class="chip" title="Typ povrchu"><span class="surface-swatch" style="--surface-pattern:${pattern}"></span>${escapeHtml(s.label)}</div>`);
   }
   for (const w of state.options.warning) {
-    items.push(`<div class="chip"><span class="marker-preview">${warningSvg(w.icon)}</span>${escapeHtml(w.label)}</div>`);
+    items.push(`<div class="chip" title="Výstraha"><span class="marker-preview">${warningSvg(w.icon)}</span>${escapeHtml(w.label)}</div>`);
   }
   el("legend").innerHTML = items.join("");
 }
