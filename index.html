@@ -664,12 +664,29 @@ async function loadProfile() {
 async function ensureRequiredMapOptions() {
   if (!isAdmin()) return;
 
-  const hasStairs = state.options.surface.some(option =>
-    ["schody", "schodiště"].includes(normalizeText(option.label))
-  );
-  if (hasStairs) return;
+  // Hledáme i neaktivní možnosti. Jinak by existující skrytá položka
+  // "Schody" nebyla v state.options a nový INSERT by narazil na UNIQUE klíč.
+  const { data: existing, error: findError } = await sb.from("map_options")
+    .select("id,label,active")
+    .eq("kind", "surface")
+    .ilike("label", "Schody")
+    .maybeSingle();
 
-  const { error } = await sb.from("map_options").insert({
+  if (findError) throw findError;
+
+  if (existing) {
+    if (!existing.active) {
+      const { error: updateError } = await sb.from("map_options")
+        .update({ active: true })
+        .eq("id", existing.id);
+      if (updateError) throw updateError;
+      await loadOptions();
+      toast("Povrch Schody byl znovu aktivován.", "success");
+    }
+    return;
+  }
+
+  const { error: insertError } = await sb.from("map_options").insert({
     kind: "surface",
     label: "Schody",
     sort_order: 900,
@@ -678,9 +695,11 @@ async function ensureRequiredMapOptions() {
     active: true
   });
 
-  if (error) throw error;
+  // Ochrana proti souběžnému spuštění initialize + auth callbacku.
+  if (insertError && insertError.code !== "23505") throw insertError;
+
   await loadOptions();
-  toast("Do povrchů byla doplněna kategorie Schody.", "success");
+  if (!insertError) toast("Do povrchů byla doplněna kategorie Schody.", "success");
 }
 
 function renderAuthUi() {
