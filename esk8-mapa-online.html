@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>ESK8 mapa povrchů</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+
+  <style>
+    :root{
+      --bg:#07111f; --panel:#0d1b2c; --panel2:#12243a; --line:#263c55;
+      --text:#eef6ff; --muted:#9db0c5; --accent:#3aa7ff; --danger:#ef4444;
+      --ok:#22c55e; --shadow:0 16px 40px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body,#app{height:100%;margin:0}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    .hidden{display:none!important}
+
+    #map{position:absolute;inset:0;background:#dfe7ee}
+    .leaflet-container{font:14px/1.35 Inter,system-ui,sans-serif}
+    .leaflet-control-attribution{font-size:10px}
+
+    .topbar{
+      position:fixed;z-index:1200;left:12px;right:12px;top:12px;height:56px;
+      display:flex;align-items:center;gap:10px;padding:8px 10px;
+      border:1px solid rgba(255,255,255,.1);border-radius:18px;
+      background:rgba(7,17,31,.92);backdrop-filter:blur(14px);box-shadow:var(--shadow)
+    }
+    .brand{display:flex;align-items:center;gap:10px;min-width:0}
+    .brand-badge{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#3aa7ff,#56e0bd);color:#06111e;font-weight:900}
+    .brand-title{font-weight:800;white-space:nowrap}
+    .brand-sub{font-size:11px;color:var(--muted);white-space:nowrap}
+    .top-spacer{flex:1}
+    .status{font-size:12px;color:var(--muted);max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    .btn{
+      border:1px solid var(--line);background:var(--panel2);color:var(--text);
+      padding:9px 12px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+      transition:.15s transform,.15s background,.15s border
+    }
+    .btn:hover{background:#18314d;border-color:#3d5875}
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{background:var(--accent);border-color:var(--accent);color:#03111f;font-weight:800}
+    .btn.danger{background:#3a1520;border-color:#6e2435;color:#ffdbe2}
+    .btn.ghost{background:transparent}
+    .btn.small{padding:7px 9px;font-size:12px}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+
+    .panel{
+      position:fixed;z-index:1150;top:80px;bottom:16px;width:min(390px,calc(100vw - 24px));
+      border:1px solid rgba(255,255,255,.1);border-radius:20px;
+      background:rgba(7,17,31,.96);backdrop-filter:blur(16px);box-shadow:var(--shadow);
+      overflow:hidden;display:flex;flex-direction:column
+    }
+    .panel.left{left:12px}
+    .panel.right{right:12px}
+    .panel-head{padding:16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+    .panel-head h2{font-size:17px;margin:0}
+    .panel-body{padding:14px;overflow:auto;flex:1}
+    .panel-footer{padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:8px}
+
+    .section{padding:12px;border:1px solid var(--line);background:rgba(18,36,58,.55);border-radius:15px;margin-bottom:12px}
+    .section h3{font-size:13px;margin:0 0 10px;color:#cfe4f7}
+    .field{margin-bottom:10px}
+    .field:last-child{margin-bottom:0}
+    label{display:block;font-size:11px;color:var(--muted);margin:0 0 5px}
+    input,select,textarea{
+      width:100%;border:1px solid var(--line);background:#081522;color:var(--text);
+      border-radius:11px;padding:10px;outline:none
+    }
+    input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+    textarea{min-height:78px;resize:vertical}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .row{display:flex;align-items:center;gap:8px}
+    .row.wrap{flex-wrap:wrap}
+    .muted{color:var(--muted);font-size:12px}
+    .warning{color:#ffd38b;font-size:12px}
+    .error{color:#ff9aaa;font-size:12px}
+    .success{color:#87efb1;font-size:12px}
+    .divider{height:1px;background:var(--line);margin:12px 0}
+
+    .legend{
+      position:fixed;z-index:1100;left:12px;bottom:16px;max-width:min(620px,calc(100vw - 24px));
+      display:flex;gap:6px;flex-wrap:wrap;padding:8px;border-radius:14px;
+      background:rgba(7,17,31,.88);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(12px)
+    }
+    .chip{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:#102138;border:1px solid var(--line);font-size:11px}
+    .swatch{width:18px;height:5px;border-radius:999px}
+    .marker-preview{width:20px;height:20px;display:grid;place-items:center}
+
+    .modal-backdrop{
+      position:fixed;z-index:2000;inset:0;background:rgba(0,0,0,.58);
+      display:grid;place-items:center;padding:18px
+    }
+    .modal{
+      width:min(440px,100%);max-height:90vh;overflow:auto;border:1px solid var(--line);
+      border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:18px
+    }
+    .modal h2{margin:0 0 6px}
+    .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+
+    .feature-card,.user-card,.option-card{
+      border:1px solid var(--line);border-radius:13px;padding:10px;margin-bottom:8px;background:#0a1828
+    }
+    .feature-card.active{border-color:var(--accent)}
+    .feature-title{font-weight:750;font-size:13px}
+    .feature-meta{font-size:11px;color:var(--muted);margin-top:3px}
+    .badge{display:inline-flex;padding:3px 7px;border-radius:999px;font-size:10px;border:1px solid var(--line);color:var(--muted)}
+    .badge.admin{color:#92d5ff;border-color:#286b92}
+    .badge.blocked{color:#ff9aaa;border-color:#8d3143}
+
+    .toast-wrap{position:fixed;z-index:3000;right:14px;bottom:14px;display:grid;gap:8px;width:min(360px,calc(100vw - 28px))}
+    .toast{padding:11px 13px;border-radius:13px;background:#102138;border:1px solid var(--line);box-shadow:var(--shadow);font-size:13px}
+    .toast.error{border-color:#8d3143;background:#321421;color:#ffdbe2}
+    .toast.success{border-color:#267549;background:#0d2a1b;color:#caffdf}
+
+    .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0d1b2c;color:var(--text)}
+    .leaflet-popup-content{margin:13px 15px;min-width:220px}
+    .popup-title{font-weight:800;margin-bottom:6px}
+    .popup-row{font-size:12px;margin:3px 0;color:#cfe0ef}
+    .popup-row b{color:white}
+    .warning-marker{background:transparent;border:0}
+    .warning-icon{
+      width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+      background:#fff;border:3px solid #ef4444;box-shadow:0 3px 12px rgba(0,0,0,.35)
+    }
+    .warning-icon svg{width:20px;height:20px;color:#cf1f36}
+
+    @media (max-width:760px){
+      .brand-sub,.status{display:none}
+      .topbar{height:54px}
+      .panel{top:76px;bottom:10px}
+      .legend{bottom:10px;right:10px;max-height:110px;overflow:auto}
+      .hide-mobile{display:none!important}
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="map"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">E8</div>
+      <div>
+        <div class="brand-title">ESK8 mapa</div>
+        <div class="brand-sub">Povrchy, kvalita a výstrahy</div>
+      </div>
+    </div>
+    <div class="top-spacer"></div>
+    <div id="connectionStatus" class="status">Načítám mapu…</div>
+    <button id="myFeaturesBtn" class="btn ghost hidden">Moje prvky</button>
+    <button id="adminBtn" class="btn ghost hidden">Správa</button>
+    <button id="editorBtn" class="btn primary hidden">Editor</button>
+    <button id="authBtn" class="btn">Přihlásit</button>
+  </header>
+
+  <aside id="editorPanel" class="panel right hidden">
+    <div class="panel-head">
+      <div style="flex:1">
+        <h2>Editor mapy</h2>
+        <div id="editorIdentity" class="muted"></div>
+      </div>
+      <button id="closeEditorBtn" class="btn small ghost">✕</button>
+    </div>
+    <div class="panel-body">
+      <div id="blockedNotice" class="section hidden">
+        <div class="error"><b>Účet je zablokovaný.</b></div>
+        <div class="muted">Mapu můžeš prohlížet, ale nemůžeš přidávat ani upravovat prvky.</div>
+      </div>
+
+      <div id="drawSection" class="section">
+        <h3>Přidat nový prvek</h3>
+        <div class="row wrap">
+          <button id="drawLineBtn" class="btn primary">＋ Úsek</button>
+          <button id="drawMarkerBtn" class="btn">＋ Výstraha</button>
+          <button id="cancelDrawBtn" class="btn ghost">Zrušit kreslení</button>
+        </div>
+        <div class="muted" style="margin-top:8px">Po nakreslení se otevře formulář. Uložení se okamžitě propíše všem návštěvníkům.</div>
+      </div>
+
+      <div id="editSection" class="section hidden">
+        <h3 id="editTitle">Upravit prvek</h3>
+        <form id="featureForm">
+          <input id="featureId" type="hidden">
+          <input id="featureKind" type="hidden">
+
+          <div id="lineFields">
+            <div class="field">
+              <label for="surfaceType">Typ povrchu</label>
+              <select id="surfaceType"></select>
+            </div>
+            <div class="field">
+              <label for="qualityType">Kvalita povrchu</label>
+              <select id="qualityType"></select>
+            </div>
+          </div>
+
+          <div id="markerFields" class="hidden">
+            <div class="field">
+              <label for="warningType">Typ výstrahy</label>
+              <select id="warningType"></select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="featureTitle">Název / krátký popis</label>
+            <input id="featureTitle" maxlength="80" placeholder="Např. rozbitý asfalt u přechodu">
+          </div>
+          <div class="field">
+            <label for="featureNote">Poznámka</label>
+            <textarea id="featureNote" maxlength="600" placeholder="Doplňující informace pro jezdce"></textarea>
+          </div>
+          <div class="field">
+            <label>Datum přidání</label>
+            <input id="featureDate" disabled>
+          </div>
+
+          <div class="row wrap">
+            <button class="btn primary" type="submit">Uložit</button>
+            <button id="editGeometryBtn" class="btn" type="button">Upravit tvar/polohu</button>
+            <button id="deleteFeatureBtn" class="btn danger" type="button">Smazat</button>
+            <button id="cancelEditBtn" class="btn ghost" type="button">Zavřít</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="section">
+        <h3>Pravidla editace</h3>
+        <div class="muted">Běžný uživatel může měnit a mazat pouze své vlastní prvky. Správce může upravovat vše. Oprávnění hlídá databáze, ne pouze tlačítka v prohlížeči.</div>
+      </div>
+    </div>
+  </aside>
+
+  <aside id="listPanel" class="panel left hidden">
+    <div class="panel-head">
+      <div style="flex:1">
+        <h2>Moje prvky</h2>
+        <div class="muted">Kliknutím prvek zobrazíš a otevřeš.</div>
+      </div>
+      <button id="closeListBtn" class="btn small ghost">✕</button>
+    </div>
+    <div id="featureList" class="panel-body"></div>
+  </aside>
+
+  <aside id="adminPanel" class="panel left hidden">
+    <div class="panel-head">
+      <div style="flex:1">
+        <h2>Správa mapy</h2>
+        <div class="muted">Uživatelé a možnosti editoru</div>
+      </div>
+      <button id="closeAdminBtn" class="btn small ghost">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="section">
+        <h3>Uživatelé</h3>
+        <div id="userList"></div>
+      </div>
+      <div class="section">
+        <h3>Možnosti linií a značek</h3>
+        <div class="grid2">
+          <button class="btn small" data-option-kind="surface">＋ Povrch</button>
+          <button class="btn small" data-option-kind="quality">＋ Kvalita</button>
+          <button class="btn small" data-option-kind="warning">＋ Výstraha</button>
+        </div>
+        <div id="optionList" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </aside>
+
+  <div id="legend" class="legend"></div>
+
+  <div id="authModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <h2>Přihlášení</h2>
+      <div class="muted">Přihlášení je potřeba pouze pro přidávání a úpravu mapy.</div>
+      <form id="authForm">
+        <div class="field" style="margin-top:14px">
+          <label for="authEmail">E-mail</label>
+          <input id="authEmail" type="email" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="authPassword">Heslo</label>
+          <input id="authPassword" type="password" minlength="6" required autocomplete="current-password">
+        </div>
+        <div id="authMessage" class="muted"></div>
+        <div class="modal-actions">
+          <button id="closeAuthBtn" class="btn ghost" type="button">Zavřít</button>
+          <button id="registerBtn" class="btn" type="button">Registrovat</button>
+          <button class="btn primary" type="submit">Přihlásit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="optionModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <h2 id="optionModalTitle">Možnost</h2>
+      <form id="optionForm">
+        <input id="optionId" type="hidden">
+        <input id="optionKind" type="hidden">
+        <div class="field">
+          <label for="optionLabel">Název</label>
+          <input id="optionLabel" maxlength="60" required>
+        </div>
+        <div id="optionColorField" class="field">
+          <label for="optionColor">Barva</label>
+          <input id="optionColor" type="color" value="#22c55e">
+        </div>
+        <div id="optionIconField" class="field hidden">
+          <label for="optionIcon">Ikona</label>
+          <select id="optionIcon">
+            <option value="warning">Výstražný trojúhelník</option>
+            <option value="bump">Nerovnost</option>
+            <option value="rail">Koleje / přejezd</option>
+            <option value="barrier">Závora</option>
+            <option value="hole">Díra</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="optionSort">Pořadí</label>
+          <input id="optionSort" type="number" value="100">
+        </div>
+        <div class="modal-actions">
+          <button id="closeOptionBtn" class="btn ghost" type="button">Zrušit</button>
+          <button class="btn primary" type="submit">Uložit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toastWrap" class="toast-wrap"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+"use strict";
+
+/* ============================================================
+   1) DOPLŇ ÚDAJE ZE SUPABASE:
+   Project Settings → API → Project URL + anon public key
+   Nikdy sem nevkládej service_role key.
+============================================================ */
+const SUPABASE_URL = "DOPLN_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "DOPLN_SUPABASE_ANON_KEY";
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
+
+const state = {
+  session: null,
+  profile: null,
+  features: new Map(),
+  layers: new Map(),
+  options: { surface: [], quality: [], warning: [] },
+  activeDraw: null,
+  pendingLayer: null,
+  editingLayer: null,
+  editHandler: null,
+  realtimeChannel: null
+};
+
+const el = id => document.getElementById(id);
+const map = L.map("map", {
+  preferCanvas: true,
+  zoomControl: false,
+  maxZoom: 21,
+  wheelPxPerZoomLevel: 90,
+  zoomAnimation: true
+}).setView([50.0755, 14.4378], 12);
+
+L.control.zoom({ position: "bottomright" }).addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 20,
+  maxNativeZoom: 19,
+  updateWhenIdle: true,
+  updateWhenZooming: false,
+  keepBuffer: 2,
+  attribution: "&copy; OpenStreetMap"
+}).addTo(map);
+
+const lineRenderer = L.canvas({ padding: 0.35, tolerance: 7 });
+const featureLayer = L.featureGroup().addTo(map);
+
+function toast(message, type = "") {
+  const n = document.createElement("div");
+  n.className = `toast ${type}`;
+  n.textContent = message;
+  el("toastWrap").appendChild(n);
+  setTimeout(() => n.remove(), 4200);
+}
+
+function setConnection(text) {
+  el("connectionStatus").textContent = text;
+}
+
+function monthYear(value) {
+  if (!value) return "neuvedeno";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "neuvedeno" :
+    String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
+}
+
+function fullDate(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("cs-CZ", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function optionById(kind, id) {
+  return state.options[kind].find(x => x.id === id) || null;
+}
+
+function isAdmin() {
+  return state.profile?.role === "admin";
+}
+
+function canEdit(feature) {
+  return !!state.session && !state.profile?.is_blocked &&
+    (isAdmin() || feature.owner_id === state.session.user.id);
+}
+
+function escapeHtml(v = "") {
+  return String(v).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
+}
+
+function warningSvg(name) {
+  const common = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"';
+  const icons = {
+    warning: `<svg ${common}><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 8v6"/><path d="M12 17.5h.01"/></svg>`,
+    bump: `<svg ${common}><path d="M3 16h18"/><path d="M6 16c1.5-5 10.5-5 12 0"/></svg>`,
+    rail: `<svg ${common}><path d="m5 5 14 14"/><path d="m19 5-14 14"/><path d="M8 2v4"/><path d="M16 18v4"/></svg>`,
+    barrier: `<svg ${common}><path d="M5 20v-7"/><path d="M19 20v-7"/><path d="M4 10h16v4H4z"/><path d="m7 10 3 4m2-4 3 4"/></svg>`,
+    hole: `<svg ${common}><ellipse cx="12" cy="15" rx="8" ry="4"/><path d="M7 12c1-4 9-4 10 0"/></svg>`
+  };
+  return icons[name] || icons.warning;
+}
+
+function markerIcon(option) {
+  const html = `<div class="warning-icon">${warningSvg(option?.icon || "warning")}</div>`;
+  return L.divIcon({ className: "warning-marker", html, iconSize: [34,34], iconAnchor: [17,17], popupAnchor: [0,-16] });
+}
+
+function lineStyle(feature) {
+  const quality = optionById("quality", feature.quality_option_id);
+  return {
+    renderer: lineRenderer,
+    color: quality?.color || "#3aa7ff",
+    weight: 6,
+    opacity: .9,
+    lineCap: "round",
+    lineJoin: "round"
+  };
+}
+
+function popupHtml(feature) {
+  const date = monthYear(feature.created_at);
+  if (feature.kind === "line") {
+    const surface = optionById("surface", feature.surface_option_id)?.label || "Neurčený povrch";
+    const quality = optionById("quality", feature.quality_option_id)?.label || "Neurčená kvalita";
+    return `<div class="popup-title">${escapeHtml(feature.title || surface)}</div>
+      <div class="popup-row"><b>Povrch:</b> ${escapeHtml(surface)}</div>
+      <div class="popup-row"><b>Kvalita:</b> ${escapeHtml(quality)}</div>
+      ${feature.note ? `<div class="popup-row">${escapeHtml(feature.note)}</div>` : ""}
+      <div class="popup-row"><b>Přidáno:</b> ${date}</div>
+      ${canEdit(feature) ? `<div style="margin-top:9px"><button class="btn small primary" onclick="window.openFeatureEditor('${feature.id}')">Upravit</button></div>` : ""}`;
+  }
+  const warning = optionById("warning", feature.warning_option_id)?.label || "Výstraha";
+  return `<div class="popup-title">${escapeHtml(feature.title || warning)}</div>
+    <div class="popup-row"><b>Typ:</b> ${escapeHtml(warning)}</div>
+    ${feature.note ? `<div class="popup-row">${escapeHtml(feature.note)}</div>` : ""}
+    <div class="popup-row"><b>Přidáno:</b> ${date}</div>
+    ${canEdit(feature) ? `<div style="margin-top:9px"><button class="btn small primary" onclick="window.openFeatureEditor('${feature.id}')">Upravit</button></div>` : ""}`;
+}
+
+function geometryToLayer(feature) {
+  let layer;
+  if (feature.kind === "line") {
+    const latlngs = feature.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+    layer = L.polyline(latlngs, lineStyle(feature));
+  } else {
+    const [lng, lat] = feature.geometry.coordinates;
+    layer = L.marker([lat, lng], { icon: markerIcon(optionById("warning", feature.warning_option_id)) });
+  }
+  layer.bindPopup(() => popupHtml(feature));
+  layer.on("click", () => {
+    if (el("editorPanel").classList.contains("hidden")) return;
+    if (canEdit(feature)) openFeatureEditor(feature.id);
+  });
+  return layer;
+}
+
+function removeFeatureLayer(id) {
+  const old = state.layers.get(id);
+  if (old) featureLayer.removeLayer(old);
+  state.layers.delete(id);
+}
+
+function upsertFeatureLayer(feature) {
+  removeFeatureLayer(feature.id);
+  state.features.set(feature.id, feature);
+  const layer = geometryToLayer(feature);
+  featureLayer.addLayer(layer);
+  state.layers.set(feature.id, layer);
+}
+
+function deleteFeatureLocal(id) {
+  removeFeatureLayer(id);
+  state.features.delete(id);
+  renderMyFeatures();
+}
+
+async function loadOptions() {
+  const { data, error } = await sb.from("map_options")
+    .select("*").eq("active", true).order("sort_order").order("label");
+  if (error) throw error;
+  state.options = { surface: [], quality: [], warning: [] };
+  for (const item of data || []) state.options[item.kind]?.push(item);
+  fillOptionSelects();
+  renderLegend();
+}
+
+async function loadFeatures() {
+  const { data, error } = await sb.from("map_features")
+    .select("*").eq("is_deleted", false).order("created_at");
+  if (error) throw error;
+  featureLayer.clearLayers();
+  state.features.clear();
+  state.layers.clear();
+  for (const feature of data || []) upsertFeatureLayer(feature);
+  renderMyFeatures();
+}
+
+function fillSelect(selectId, items) {
+  const select = el(selectId);
+  const current = select.value;
+  select.innerHTML = items.map(x => `<option value="${x.id}">${escapeHtml(x.label)}</option>`).join("");
+  if (items.some(x => x.id === current)) select.value = current;
+}
+
+function fillOptionSelects() {
+  fillSelect("surfaceType", state.options.surface);
+  fillSelect("qualityType", state.options.quality);
+  fillSelect("warningType", state.options.warning);
+}
+
+function renderLegend() {
+  const items = [];
+  for (const q of state.options.quality) {
+    items.push(`<div class="chip"><span class="swatch" style="background:${q.color || "#3aa7ff"}"></span>${escapeHtml(q.label)}</div>`);
+  }
+  for (const w of state.options.warning) {
+    items.push(`<div class="chip"><span class="marker-preview">${warningSvg(w.icon)}</span>${escapeHtml(w.label)}</div>`);
+  }
+  el("legend").innerHTML = items.join("");
+}
+
+async function loadProfile() {
+  state.profile = null;
+  if (!state.session) return;
+  const { data, error } = await sb.from("profiles").select("*").eq("id", state.session.user.id).single();
+  if (error) throw error;
+  state.profile = data;
+}
+
+function renderAuthUi() {
+  const logged = !!state.session;
+  el("authBtn").textContent = logged ? "Odhlásit" : "Přihlásit";
+  el("editorBtn").classList.toggle("hidden", !logged);
+  el("myFeaturesBtn").classList.toggle("hidden", !logged);
+  el("adminBtn").classList.toggle("hidden", !isAdmin());
+
+  if (logged) {
+    el("editorIdentity").textContent =
+      `${state.profile?.display_name || state.session.user.email}${isAdmin() ? " · správce" : ""}`;
+  }
+
+  const blocked = !!state.profile?.is_blocked;
+  el("blockedNotice").classList.toggle("hidden", !blocked);
+  el("drawSection").classList.toggle("hidden", blocked);
+}
+
+async function initialize() {
+  try {
+    if (SUPABASE_URL.startsWith("DOPLN_")) {
+      setConnection("Doplň nastavení Supabase v HTML");
+      toast("Nejdřív doplň SUPABASE_URL a SUPABASE_ANON_KEY.", "error");
+      return;
+    }
+
+    const { data: { session } } = await sb.auth.getSession();
+    state.session = session;
+    await Promise.all([loadOptions(), loadFeatures()]);
+    if (session) await loadProfile();
+    renderAuthUi();
+    subscribeRealtime();
+    setConnection("Mapa je online");
+  } catch (error) {
+    console.error(error);
+    setConnection("Chyba připojení");
+    toast(error.message || "Nepodařilo se načíst mapu.", "error");
+  }
+}
+
+function subscribeRealtime() {
+  if (state.realtimeChannel) sb.removeChannel(state.realtimeChannel);
+  state.realtimeChannel = sb.channel("esk8-live")
+    .on("postgres_changes", { event: "*", schema: "public", table: "map_features" }, payload => {
+      if (payload.eventType === "DELETE") deleteFeatureLocal(payload.old.id);
+      else if (payload.new.is_deleted) deleteFeatureLocal(payload.new.id);
+      else upsertFeatureLayer(payload.new);
+      renderMyFeatures();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "map_options" }, async () => {
+      try {
+        await loadOptions();
+        for (const feature of state.features.values()) upsertFeatureLayer(feature);
+      } catch (e) { console.error(e); }
+    })
+    .subscribe(status => setConnection(status === "SUBSCRIBED" ? "Mapa je online" : "Připojuji živé změny…"));
+}
+
+function openPanel(id) {
+  for (const pid of ["editorPanel","listPanel","adminPanel"]) {
+    if (pid !== id) el(pid).classList.add("hidden");
+  }
+  el(id).classList.remove("hidden");
+}
+
+function closePanels() {
+  for (const pid of ["editorPanel","listPanel","adminPanel"]) el(pid).classList.add("hidden");
+  stopDrawing();
+  stopGeometryEdit(false);
+}
+
+function startDrawing(kind) {
+  if (!state.session || state.profile?.is_blocked) return;
+  stopDrawing();
+  state.pendingLayer = null;
+
+  if (kind === "line") {
+    state.activeDraw = new L.Draw.Polyline(map, {
+      shapeOptions: { color: "#3aa7ff", weight: 6, opacity: .9, renderer: lineRenderer },
+      guidelineDistance: 14,
+      maxGuideLineLength: 2000
+    });
+  } else {
+    const warning = state.options.warning[0];
+    state.activeDraw = new L.Draw.Marker(map, { icon: markerIcon(warning) });
+  }
+  state.activeDraw.enable();
+  toast(kind === "line" ? "Klikáním vyznač úsek, dokonči posledním bodem." : "Klikni na místo výstrahy.");
+}
+
+function stopDrawing() {
+  if (state.activeDraw) state.activeDraw.disable();
+  state.activeDraw = null;
+  if (state.pendingLayer) map.removeLayer(state.pendingLayer);
+  state.pendingLayer = null;
+}
+
+map.on(L.Draw.Event.CREATED, e => {
+  stopDrawing();
+  state.pendingLayer = e.layer.addTo(map);
+  openNewFeatureForm(e.layer instanceof L.Marker ? "warning" : "line");
+});
+
+function showFormKind(kind) {
+  el("featureKind").value = kind;
+  el("lineFields").classList.toggle("hidden", kind !== "line");
+  el("markerFields").classList.toggle("hidden", kind === "line");
+}
+
+function openNewFeatureForm(kind) {
+  openPanel("editorPanel");
+  el("editSection").classList.remove("hidden");
+  el("editTitle").textContent = kind === "line" ? "Nový úsek" : "Nová výstraha";
+  el("featureId").value = "";
+  el("featureTitle").value = "";
+  el("featureNote").value = "";
+  el("featureDate").value = fullDate(new Date().toISOString());
+  el("deleteFeatureBtn").classList.add("hidden");
+  el("editGeometryBtn").classList.add("hidden");
+  showFormKind(kind);
+}
+
+window.openFeatureEditor = function(id) {
+  const feature = state.features.get(id);
+  if (!feature || !canEdit(feature)) return;
+  openPanel("editorPanel");
+  el("editSection").classList.remove("hidden");
+  el("editTitle").textContent = feature.kind === "line" ? "Upravit úsek" : "Upravit výstrahu";
+  el("featureId").value = feature.id;
+  el("featureTitle").value = feature.title || "";
+  el("featureNote").value = feature.note || "";
+  el("featureDate").value = fullDate(feature.created_at);
+  showFormKind(feature.kind);
+  if (feature.kind === "line") {
+    el("surfaceType").value = feature.surface_option_id || "";
+    el("qualityType").value = feature.quality_option_id || "";
+  } else {
+    el("warningType").value = feature.warning_option_id || "";
+  }
+  el("deleteFeatureBtn").classList.remove("hidden");
+  el("editGeometryBtn").classList.remove("hidden");
+  state.layers.get(id)?.openPopup();
+};
+
+function layerToGeometry(layer, kind) {
+  if (kind === "line") {
+    const latlngs = layer.getLatLngs();
+    return { type: "LineString", coordinates: latlngs.map(ll => [ll.lng, ll.lat]) };
+  }
+  const ll = layer.getLatLng();
+  return { type: "Point", coordinates: [ll.lng, ll.lat] };
+}
+
+el("featureForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!state.session || state.profile?.is_blocked) return;
+  const id = el("featureId").value;
+  const kind = el("featureKind").value;
+  const existing = id ? state.features.get(id) : null;
+  const sourceLayer = id ? state.layers.get(id) : state.pendingLayer;
+  if (!sourceLayer) return toast("Chybí geometrie prvku.", "error");
+
+  const payload = {
+    kind,
+    title: el("featureTitle").value.trim() || null,
+    note: el("featureNote").value.trim() || null,
+    geometry: layerToGeometry(sourceLayer, kind),
+    surface_option_id: kind === "line" ? el("surfaceType").value || null : null,
+    quality_option_id: kind === "line" ? el("qualityType").value || null : null,
+    warning_option_id: kind === "warning" ? el("warningType").value || null : null
+  };
+
+  try {
+    if (existing) {
+      const { error } = await sb.from("map_features").update(payload).eq("id", id);
+      if (error) throw error;
+    } else {
+      const { error } = await sb.from("map_features").insert(payload);
+      if (error) throw error;
+      if (state.pendingLayer) map.removeLayer(state.pendingLayer);
+      state.pendingLayer = null;
+    }
+    stopGeometryEdit(false);
+    el("editSection").classList.add("hidden");
+    toast("Uloženo do mapy.", "success");
+  } catch (error) {
+    console.error(error);
+    toast(error.message || "Uložení selhalo.", "error");
+  }
+});
+
+function stopGeometryEdit(saveVisual = true) {
+  if (!state.editHandler) return;
+  if (saveVisual) state.editHandler.save?.();
+  else state.editHandler.revertLayers?.();
+  state.editHandler.disable();
+  state.editHandler = null;
+  state.editingLayer = null;
+  el("editGeometryBtn").textContent = "Upravit tvar/polohu";
+}
+
+el("editGeometryBtn").addEventListener("click", () => {
+  const id = el("featureId").value;
+  const layer = state.layers.get(id);
+  if (!layer) return;
+
+  if (state.editHandler) {
+    stopGeometryEdit(true);
+    toast("Nový tvar je připraven. Potvrď tlačítkem Uložit.");
+    return;
+  }
+
+  const group = L.featureGroup([layer]).addTo(map);
+  state.editHandler = new L.EditToolbar.Edit(map, { featureGroup: group });
+  state.editHandler.enable();
+  state.editingLayer = layer;
+  el("editGeometryBtn").textContent = "Dokončit tvar";
+  toast("Posuň body nebo značku, potom klikni na Dokončit tvar.");
+});
+
+el("deleteFeatureBtn").addEventListener("click", async () => {
+  const id = el("featureId").value;
+  if (!id || !confirm("Opravdu tento prvek smazat?")) return;
+  try {
+    const { error } = await sb.from("map_features").update({ is_deleted: true }).eq("id", id);
+    if (error) throw error;
+    el("editSection").classList.add("hidden");
+    toast("Prvek byl smazán.", "success");
+  } catch (error) {
+    toast(error.message || "Smazání selhalo.", "error");
+  }
+});
+
+function renderMyFeatures() {
+  if (!state.session) return;
+  const features = [...state.features.values()]
+    .filter(f => isAdmin() || f.owner_id === state.session.user.id)
+    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  el("featureList").innerHTML = features.length ? features.map(f => {
+    const label = f.kind === "line"
+      ? optionById("surface", f.surface_option_id)?.label || "Úsek"
+      : optionById("warning", f.warning_option_id)?.label || "Výstraha";
+    return `<div class="feature-card" data-feature-id="${f.id}">
+      <div class="feature-title">${escapeHtml(f.title || label)}</div>
+      <div class="feature-meta">${f.kind === "line" ? "Linie" : "Výstraha"} · ${monthYear(f.created_at)}</div>
+    </div>`;
+  }).join("") : `<div class="muted">Zatím tu nemáš žádné prvky.</div>`;
+
+  el("featureList").querySelectorAll("[data-feature-id]").forEach(card => {
+    card.addEventListener("click", () => {
+      const id = card.dataset.featureId;
+      const layer = state.layers.get(id);
+      if (!layer) return;
+      if (layer.getBounds) map.fitBounds(layer.getBounds().pad(.5), { maxZoom: 18 });
+      else map.setView(layer.getLatLng(), 18);
+      layer.openPopup();
+      openFeatureEditor(id);
+    });
+  });
+}
+
+async function loadAdmin() {
+  if (!isAdmin()) return;
+  const [{ data: profiles, error: pe }, { data: options, error: oe }] = await Promise.all([
+    sb.from("profiles").select("*").order("created_at", { ascending: false }),
+    sb.from("map_options").select("*").order("kind").order("sort_order")
+  ]);
+  if (pe) throw pe;
+  if (oe) throw oe;
+
+  el("userList").innerHTML = (profiles || []).map(p => `<div class="user-card">
+    <div class="row">
+      <div style="flex:1;min-width:0">
+        <div class="feature-title">${escapeHtml(p.display_name || p.email || p.id)}</div>
+        <div class="feature-meta">${escapeHtml(p.email || "")}</div>
+      </div>
+      <span class="badge ${p.role === "admin" ? "admin" : ""}">${p.role}</span>
+      ${p.is_blocked ? `<span class="badge blocked">blokován</span>` : ""}
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn small ${p.is_blocked ? "" : "danger"}" data-block-user="${p.id}" data-block-value="${!p.is_blocked}">
+        ${p.is_blocked ? "Odblokovat" : "Zablokovat"}
+      </button>
+    </div>
+  </div>`).join("");
+
+  el("userList").querySelectorAll("[data-block-user]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      try {
+        const { error } = await sb.from("profiles")
+          .update({ is_blocked: btn.dataset.blockValue === "true" })
+          .eq("id", btn.dataset.blockUser);
+        if (error) throw error;
+        await loadAdmin();
+        toast("Stav uživatele změněn.", "success");
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+
+  el("optionList").innerHTML = (options || []).map(o => `<div class="option-card">
+    <div class="row">
+      ${o.kind === "quality" ? `<span class="swatch" style="background:${o.color}"></span>` : ""}
+      ${o.kind === "warning" ? `<span class="marker-preview">${warningSvg(o.icon)}</span>` : ""}
+      <div style="flex:1">
+        <div class="feature-title">${escapeHtml(o.label)}</div>
+        <div class="feature-meta">${o.kind} · pořadí ${o.sort_order} · ${o.active ? "aktivní" : "skryté"}</div>
+      </div>
+      <button class="btn small" data-edit-option="${o.id}">Upravit</button>
+    </div>
+  </div>`).join("");
+
+  el("optionList").querySelectorAll("[data-edit-option]").forEach(btn => {
+    btn.addEventListener("click", () => openOptionModal((options || []).find(o => o.id === btn.dataset.editOption)));
+  });
+}
+
+function openOptionModal(option = null, kind = null) {
+  const resolvedKind = option?.kind || kind;
+  el("optionId").value = option?.id || "";
+  el("optionKind").value = resolvedKind;
+  el("optionLabel").value = option?.label || "";
+  el("optionColor").value = option?.color || "#22c55e";
+  el("optionIcon").value = option?.icon || "warning";
+  el("optionSort").value = option?.sort_order ?? 100;
+  el("optionColorField").classList.toggle("hidden", resolvedKind !== "quality");
+  el("optionIconField").classList.toggle("hidden", resolvedKind !== "warning");
+  el("optionModalTitle").textContent = `${option ? "Upravit" : "Přidat"}: ${resolvedKind}`;
+  el("optionModal").classList.remove("hidden");
+}
+
+el("optionForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const id = el("optionId").value;
+  const kind = el("optionKind").value;
+  const payload = {
+    kind,
+    label: el("optionLabel").value.trim(),
+    sort_order: Number(el("optionSort").value || 100),
+    color: kind === "quality" ? el("optionColor").value : null,
+    icon: kind === "warning" ? el("optionIcon").value : null,
+    active: true
+  };
+  try {
+    const query = id ? sb.from("map_options").update(payload).eq("id", id) : sb.from("map_options").insert(payload);
+    const { error } = await query;
+    if (error) throw error;
+    el("optionModal").classList.add("hidden");
+    await loadAdmin();
+    toast("Možnost uložena.", "success");
+  } catch (error) { toast(error.message, "error"); }
+});
+
+/* UI */
+el("authBtn").addEventListener("click", async () => {
+  if (state.session) {
+    await sb.auth.signOut();
+  } else {
+    el("authModal").classList.remove("hidden");
+  }
+});
+el("closeAuthBtn").onclick = () => el("authModal").classList.add("hidden");
+el("closeOptionBtn").onclick = () => el("optionModal").classList.add("hidden");
+el("editorBtn").onclick = () => openPanel("editorPanel");
+el("myFeaturesBtn").onclick = () => { renderMyFeatures(); openPanel("listPanel"); };
+el("adminBtn").onclick = async () => {
+  try { await loadAdmin(); openPanel("adminPanel"); }
+  catch (e) { toast(e.message, "error"); }
+};
+el("closeEditorBtn").onclick = closePanels;
+el("closeListBtn").onclick = closePanels;
+el("closeAdminBtn").onclick = closePanels;
+el("drawLineBtn").onclick = () => startDrawing("line");
+el("drawMarkerBtn").onclick = () => startDrawing("warning");
+el("cancelDrawBtn").onclick = stopDrawing;
+el("cancelEditBtn").onclick = () => {
+  if (state.pendingLayer) map.removeLayer(state.pendingLayer);
+  state.pendingLayer = null;
+  stopGeometryEdit(false);
+  el("editSection").classList.add("hidden");
+};
+document.querySelectorAll("[data-option-kind]").forEach(btn => {
+  btn.addEventListener("click", () => openOptionModal(null, btn.dataset.optionKind));
+});
+
+el("authForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  el("authMessage").textContent = "Přihlašuji…";
+  const { error } = await sb.auth.signInWithPassword({
+    email: el("authEmail").value.trim(),
+    password: el("authPassword").value
+  });
+  el("authMessage").textContent = error ? error.message : "";
+  if (!error) el("authModal").classList.add("hidden");
+});
+
+el("registerBtn").addEventListener("click", async () => {
+  el("authMessage").textContent = "Registruji…";
+  const { error } = await sb.auth.signUp({
+    email: el("authEmail").value.trim(),
+    password: el("authPassword").value
+  });
+  el("authMessage").textContent = error
+    ? error.message
+    : "Registrace proběhla. Podle nastavení Supabase může být nutné potvrdit e-mail.";
+});
+
+sb.auth.onAuthStateChange(async (_event, session) => {
+  state.session = session;
+  try {
+    if (session) await loadProfile();
+    else state.profile = null;
+    renderAuthUi();
+    await loadFeatures();
+    if (!session) closePanels();
+  } catch (e) {
+    console.error(e);
+    toast(e.message, "error");
+  }
+});
+
+initialize();
+</script>
+</body>
+</html>
