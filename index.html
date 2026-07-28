@@ -139,6 +139,76 @@
     }
     .warning-icon svg{width:20px;height:20px;color:#cf1f36}
 
+
+
+    /* GPS MAPOVÁNÍ — samostatná podstránka uvnitř aplikace */
+    .gps-page{
+      position:fixed;z-index:1800;inset:0;background:var(--bg);color:var(--text);
+      display:flex;flex-direction:column;overflow:hidden
+    }
+    .gps-page-head{
+      flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:10px 12px;
+      padding-top:max(10px,env(safe-area-inset-top));background:#081522;
+      border-bottom:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.24)
+    }
+    .gps-page-title{min-width:0;flex:1}
+    .gps-page-title b{display:block;font-size:16px}
+    .gps-page-title span{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .gps-actions{
+      flex:0 0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;
+      padding:10px 12px;background:#091728;border-bottom:1px solid var(--line)
+    }
+    .gps-actions .btn{min-height:48px;padding:8px 6px;font-weight:800}
+    .gps-actions .gps-start{background:#0e4d2c;border-color:#1f9c58;color:#d9ffe8}
+    .gps-actions .gps-pause{background:#4a3313;border-color:#9a641d;color:#ffe9bd}
+    .gps-actions .gps-stop{background:#4a1822;border-color:#9b3045;color:#ffdbe2}
+    .gps-actions .gps-export{background:#0d4b6d;border-color:#188cc7;color:#e2f6ff}
+    #gpsRecorderMap{flex:0 0 clamp(260px,34vh,420px);width:100%;background:#dfe7ee;overflow:hidden;isolation:isolate}
+    .gps-statusbar{
+      flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px;
+      background:#081522;border-top:1px solid var(--line);border-bottom:1px solid var(--line)
+    }
+    .gps-status-dot{width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.15)}
+    .gps-status-dot.recording{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.17)}
+    .gps-status-dot.paused{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.17)}
+    .gps-status-text{font-size:13px;flex:1}
+    .gps-accuracy{font-size:12px;color:var(--muted)}
+    .gps-local-warning{padding:9px 14px;background:#7c2d12;color:#ffedd5;font-size:12px;border-bottom:1px solid #b45309}
+    .gps-scroll{flex:1;min-height:0;overflow:auto;padding:12px;padding-bottom:max(18px,env(safe-area-inset-bottom))}
+    .gps-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
+    .gps-stat{border:1px solid var(--line);border-radius:14px;background:#0b1a2b;padding:10px;text-align:center}
+    .gps-stat strong{display:block;font-size:20px}
+    .gps-stat span{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+    .gps-section{margin-bottom:16px}
+    .gps-section-head{display:flex;align-items:end;gap:8px;margin-bottom:8px}
+    .gps-section-head h3{margin:0;font-size:15px}
+    .gps-section-head span{font-size:11px;color:var(--muted)}
+    .gps-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .gps-choice{
+      min-height:60px;border:1px solid var(--line);border-radius:14px;background:#102138;color:var(--text);
+      padding:8px 7px;font-weight:750;display:flex;align-items:center;justify-content:center;gap:6px;text-align:center
+    }
+    .gps-choice.active{border-color:#38bdf8;background:#104967;box-shadow:0 0 0 3px rgba(56,189,248,.22)}
+    .gps-choice.warning-choice{min-height:68px;flex-direction:column;font-size:12px}
+    .gps-choice.warning-choice .marker-preview{width:24px;height:24px}
+    .gps-choice.warning-choice svg{width:23px;height:23px}
+    .gps-footer-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:2px}
+    .gps-mini-note{margin-top:9px;font-size:11px;color:var(--muted);line-height:1.45}
+    .gps-position-marker{width:20px;height:20px;border-radius:50%;background:#168eea;border:4px solid white;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+    .gps-open-btn .short-label{display:none}
+
+    @media (max-width:760px){
+      .gps-open-btn .long-label{display:none}
+      .gps-open-btn .short-label{display:inline}
+      .gps-page-head{padding-left:8px;padding-right:8px}
+      .gps-actions{padding:8px;gap:6px}
+      .gps-actions .btn{font-size:12px;min-height:52px}
+      #gpsRecorderMap{flex-basis:32vh;min-height:250px}
+      .gps-scroll{padding:10px}
+      .gps-choice-grid{gap:7px}
+      .gps-choice{font-size:14px;min-height:58px}
+    }
+
     @media (max-width:760px){
       .brand-sub,.status{display:none}
       .topbar{height:54px}
@@ -162,11 +232,76 @@
     </div>
     <div class="top-spacer"></div>
     <div id="connectionStatus" class="status">Načítám mapu…</div>
+    <button id="gpsRecorderBtn" class="btn ghost gps-open-btn hidden" title="GPS mapování"><span class="long-label">● GPS záznam</span><span class="short-label">● GPS</span></button>
     <button id="myFeaturesBtn" class="btn ghost hidden">Moje prvky</button>
     <button id="adminBtn" class="btn ghost hidden">Správa</button>
     <button id="editorBtn" class="btn primary hidden">Editor</button>
     <button id="authBtn" class="btn">Přihlásit</button>
   </header>
+
+
+
+  <!-- GPS MAPOVÁNÍ: samostatná podstránka, data zůstávají v telefonu do exportu -->
+  <section id="gpsRecorderPage" class="gps-page hidden" aria-label="GPS záznam trasy">
+    <div class="gps-page-head">
+      <button id="closeGpsRecorderBtn" class="btn ghost small">← Mapa</button>
+      <div class="gps-page-title">
+        <b>GPS mapování povrchu</b>
+        <span>Trasa se rozdělí při každé změně povrchu nebo kvality</span>
+      </div>
+      <button id="clearGpsRecorderBtn" class="btn danger small">Vymazat</button>
+    </div>
+
+    <div class="gps-actions">
+      <button id="gpsStartBtn" class="btn gps-start">▶ Start</button>
+      <button id="gpsPauseBtn" class="btn gps-pause" disabled>⏸ Pauza</button>
+      <button id="gpsStopBtn" class="btn gps-stop" disabled>■ Stop</button>
+      <button id="gpsExportBtn" class="btn gps-export" disabled>↓ GeoJSON</button>
+    </div>
+
+    <div id="gpsLocalWarning" class="gps-local-warning hidden">
+      GPS funguje pouze na zabezpečené HTTPS adrese. Po nasazení této stránky přes GitHub Pages bude poloha dostupná.
+    </div>
+
+    <div id="gpsRecorderMap"></div>
+
+    <div class="gps-statusbar">
+      <span id="gpsStatusDot" class="gps-status-dot"></span>
+      <span id="gpsStatusText" class="gps-status-text">Připraveno</span>
+      <span id="gpsAccuracy" class="gps-accuracy">GPS: —</span>
+    </div>
+
+    <div class="gps-scroll">
+      <div class="gps-stats">
+        <div class="gps-stat"><strong id="gpsDistance">0 m</strong><span>vzdálenost</span></div>
+        <div class="gps-stat"><strong id="gpsPointCount">0</strong><span>GPS body</span></div>
+        <div class="gps-stat"><strong id="gpsWarningCount">0</strong><span>výstrahy</span></div>
+      </div>
+
+      <div class="gps-section">
+        <div class="gps-section-head"><h3>Povrch</h3><span>Změna založí nový úsek</span></div>
+        <div id="gpsSurfaceOptions" class="gps-choice-grid"><div class="muted">Načítám možnosti…</div></div>
+      </div>
+
+      <div class="gps-section">
+        <div class="gps-section-head"><h3>Kvalita</h3><span>Barva výsledné linie</span></div>
+        <div id="gpsQualityOptions" class="gps-choice-grid"><div class="muted">Načítám možnosti…</div></div>
+      </div>
+
+      <div class="gps-section">
+        <div class="gps-section-head"><h3>Výstrahy</h3><span>Uloží bod na poslední přesnou polohu</span></div>
+        <div id="gpsWarningOptions" class="gps-choice-grid"><div class="muted">Načítám možnosti…</div></div>
+      </div>
+
+      <div class="gps-footer-actions">
+        <button id="gpsCenterBtn" class="btn small">◎ Moje poloha</button>
+        <button id="gpsSaveDraftBtn" class="btn small ghost">Uložit rozpracované</button>
+      </div>
+      <div class="gps-mini-note">
+        Záznam se průběžně ukládá v tomto telefonu. Export vytváří linie s vlastnostmi <b>surface</b> a <b>quality</b> a body s vlastností <b>warning</b>, takže je lze nahrát přes existující GeoJSON import ve správě mapy.
+      </div>
+    </div>
+  </section>
 
   <aside id="editorPanel" class="panel right hidden">
     <div class="panel-head">
@@ -613,6 +748,7 @@ async function loadOptions() {
   for (const item of data || []) state.options[item.kind]?.push(item);
   fillOptionSelects();
   renderLegend();
+  renderGpsRecorderOptions();
 }
 
 async function loadFeatures() {
@@ -707,6 +843,7 @@ function renderAuthUi() {
   el("authBtn").textContent = logged ? "Odhlásit" : "Přihlásit";
   el("editorBtn").classList.toggle("hidden", !logged);
   el("myFeaturesBtn").classList.toggle("hidden", !logged);
+  el("gpsRecorderBtn").classList.toggle("hidden", !logged);
   el("adminBtn").classList.toggle("hidden", !isAdmin());
 
   if (logged) {
@@ -1297,7 +1434,591 @@ async function importGeoJsonFile(file) {
   toast(`GeoJSON importován (${imported} prvků).`, "success");
 }
 
+
+/* ============================================================
+   GPS MAPOVÁNÍ — lokální záznam a GeoJSON export
+============================================================ */
+const GPS_STORAGE_KEY = "esk8-gps-recorder-v2";
+const gpsRecorder = {
+  map: null,
+  trackLayer: null,
+  warningLayer: null,
+  positionLayer: null,
+  accuracyLayer: null,
+  watchId: null,
+  mode: "idle", // idle | recording | paused | stopped
+  surfaceId: null,
+  qualityId: null,
+  segments: [],
+  currentSegment: null,
+  warnings: [],
+  lastLocation: null,
+  lastAccepted: null,
+  distanceM: 0,
+  centeredOnce: false,
+  wakeLock: null
+};
+
+function gpsOption(kind, id) {
+  return state.options[kind]?.find(item => item.id === id) || null;
+}
+
+function gpsSetStatus(text, mode = gpsRecorder.mode) {
+  el("gpsStatusText").textContent = text;
+  const dot = el("gpsStatusDot");
+  dot.className = "gps-status-dot";
+  if (mode === "recording") dot.classList.add("recording");
+  if (mode === "paused") dot.classList.add("paused");
+}
+
+function gpsUpdateButtons() {
+  const isRecording = gpsRecorder.mode === "recording";
+  const isPaused = gpsRecorder.mode === "paused";
+  const isStopped = gpsRecorder.mode === "stopped";
+  el("gpsStartBtn").disabled = isRecording || isPaused;
+  el("gpsPauseBtn").disabled = !(isRecording || isPaused);
+  el("gpsPauseBtn").textContent = isPaused ? "▶ Pokračovat" : "⏸ Pauza";
+  el("gpsStopBtn").disabled = !(isRecording || isPaused);
+  el("gpsExportBtn").disabled = !gpsHasExportableData();
+  if (isStopped) gpsSetStatus("Záznam ukončen — připraveno k exportu", "stopped");
+}
+
+function gpsHasExportableData() {
+  return gpsRecorder.segments.some(segment => segment.points.length >= 2) || gpsRecorder.warnings.length > 0;
+}
+
+function gpsDistanceBetween(a, b) {
+  const toRad = value => value * Math.PI / 180;
+  const earth = 6371000;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * earth * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function gpsFormatDistance(meters) {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(meters < 10000 ? 2 : 1)} km`;
+}
+
+function gpsTotalPoints() {
+  return gpsRecorder.segments.reduce((sum, segment) => sum + segment.points.length, 0);
+}
+
+function gpsUpdateStats() {
+  el("gpsDistance").textContent = gpsFormatDistance(gpsRecorder.distanceM);
+  el("gpsPointCount").textContent = String(gpsTotalPoints());
+  el("gpsWarningCount").textContent = String(gpsRecorder.warnings.length);
+  el("gpsExportBtn").disabled = !gpsHasExportableData();
+}
+
+function renderGpsRecorderOptions() {
+  if (!el("gpsSurfaceOptions")) return;
+
+  if (!gpsRecorder.surfaceId || !state.options.surface.some(x => x.id === gpsRecorder.surfaceId)) {
+    gpsRecorder.surfaceId = state.options.surface[0]?.id || null;
+  }
+  if (!gpsRecorder.qualityId || !state.options.quality.some(x => x.id === gpsRecorder.qualityId)) {
+    gpsRecorder.qualityId = state.options.quality[0]?.id || null;
+  }
+
+  el("gpsSurfaceOptions").innerHTML = state.options.surface.length
+    ? state.options.surface.map(item => `<button type="button" class="gps-choice ${item.id === gpsRecorder.surfaceId ? "active" : ""}" data-gps-surface="${item.id}">${escapeHtml(item.label)}</button>`).join("")
+    : `<div class="muted">Nejsou dostupné žádné povrchy.</div>`;
+
+  el("gpsQualityOptions").innerHTML = state.options.quality.length
+    ? state.options.quality.map(item => `<button type="button" class="gps-choice ${item.id === gpsRecorder.qualityId ? "active" : ""}" data-gps-quality="${item.id}" style="border-bottom:4px solid ${item.color || "#3aa7ff"}">${escapeHtml(item.label)}</button>`).join("")
+    : `<div class="muted">Nejsou dostupné žádné kvality.</div>`;
+
+  el("gpsWarningOptions").innerHTML = state.options.warning.length
+    ? state.options.warning.map(item => `<button type="button" class="gps-choice warning-choice" data-gps-warning="${item.id}"><span class="marker-preview">${warningSvg(item.icon || "warning")}</span><span>${escapeHtml(item.label)}</span></button>`).join("")
+    : `<div class="muted">Nejsou dostupné žádné výstrahy.</div>`;
+
+  el("gpsSurfaceOptions").querySelectorAll("[data-gps-surface]").forEach(button => {
+    button.addEventListener("click", () => gpsChangeCategory("surface", button.dataset.gpsSurface));
+  });
+  el("gpsQualityOptions").querySelectorAll("[data-gps-quality]").forEach(button => {
+    button.addEventListener("click", () => gpsChangeCategory("quality", button.dataset.gpsQuality));
+  });
+  el("gpsWarningOptions").querySelectorAll("[data-gps-warning]").forEach(button => {
+    button.addEventListener("click", () => gpsAddWarning(button.dataset.gpsWarning));
+  });
+
+  gpsSaveDraft(false);
+}
+
+function gpsChangeCategory(kind, id) {
+  if (kind === "surface") gpsRecorder.surfaceId = id;
+  else gpsRecorder.qualityId = id;
+
+  if (gpsRecorder.mode === "recording") {
+    const segment = gpsRecorder.currentSegment;
+    if (segment && segment.points.length <= 1) {
+      segment.surfaceId = gpsRecorder.surfaceId;
+      segment.qualityId = gpsRecorder.qualityId;
+      gpsRestyleSegment(segment);
+    } else {
+      gpsStartSegment(true);
+    }
+    const surface = gpsOption("surface", gpsRecorder.surfaceId)?.label || "povrch";
+    const quality = gpsOption("quality", gpsRecorder.qualityId)?.label || "kvalita";
+    gpsSetStatus(`Zapisuje se: ${surface} · ${quality}`, "recording");
+  }
+
+  renderGpsRecorderOptions();
+}
+
+function gpsInitMap() {
+  if (gpsRecorder.map) return;
+  gpsRecorder.map = L.map("gpsRecorderMap", {
+    preferCanvas: true,
+    zoomControl: true,
+    maxZoom: 21,
+    attributionControl: true
+  }).setView([50.0755, 14.4378], 14);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 20,
+    maxNativeZoom: 19,
+    updateWhenIdle: true,
+    keepBuffer: 2,
+    attribution: "&copy; OpenStreetMap"
+  }).addTo(gpsRecorder.map);
+
+  gpsRecorder.trackLayer = L.layerGroup().addTo(gpsRecorder.map);
+  gpsRecorder.warningLayer = L.layerGroup().addTo(gpsRecorder.map);
+  gpsRebuildMapLayers();
+}
+
+function gpsOpenPage() {
+  if (!state.session) {
+    el("authModal").classList.remove("hidden");
+    toast("GPS záznam je dostupný pouze po přihlášení.", "error");
+    return;
+  }
+  el("gpsRecorderPage").classList.remove("hidden");
+  el("gpsLocalWarning").classList.toggle("hidden", window.isSecureContext);
+  gpsInitMap();
+  renderGpsRecorderOptions();
+  gpsUpdateStats();
+  gpsUpdateButtons();
+  setTimeout(() => gpsRecorder.map.invalidateSize(), 80);
+}
+
+function gpsClosePage() {
+  el("gpsRecorderPage").classList.add("hidden");
+}
+
+function gpsLineStyle(segment) {
+  const quality = gpsOption("quality", segment.qualityId);
+  return { color: quality?.color || "#3aa7ff", weight: 7, opacity: .92, lineCap: "round", lineJoin: "round" };
+}
+
+function gpsRestyleSegment(segment) {
+  if (segment.layer) segment.layer.setStyle(gpsLineStyle(segment));
+}
+
+function gpsRebuildMapLayers() {
+  if (!gpsRecorder.map || !gpsRecorder.trackLayer || !gpsRecorder.warningLayer) return;
+  gpsRecorder.trackLayer.clearLayers();
+  gpsRecorder.warningLayer.clearLayers();
+
+  for (const segment of gpsRecorder.segments) {
+    const latlngs = segment.points.map(point => [point.lat, point.lng]);
+    segment.layer = L.polyline(latlngs, gpsLineStyle(segment)).addTo(gpsRecorder.trackLayer);
+  }
+
+  for (const warning of gpsRecorder.warnings) {
+    const option = gpsOption("warning", warning.warningId);
+    warning.layer = L.marker([warning.lat, warning.lng], { icon: markerIcon(option) })
+      .bindPopup(`<b>${escapeHtml(option?.label || warning.warningLabel || "Výstraha")}</b><br><span class="muted">GPS záznam</span>`)
+      .addTo(gpsRecorder.warningLayer);
+  }
+
+  gpsUpdatePositionMarker();
+}
+
+function gpsUpdatePositionMarker() {
+  if (!gpsRecorder.map || !gpsRecorder.lastLocation) return;
+  const point = gpsRecorder.lastLocation;
+  if (!gpsRecorder.positionLayer) {
+    const icon = L.divIcon({ className: "", html: '<div class="gps-position-marker"></div>', iconSize: [20,20], iconAnchor: [10,10] });
+    gpsRecorder.positionLayer = L.marker([point.lat, point.lng], { icon, zIndexOffset: 1000 }).addTo(gpsRecorder.map);
+  } else {
+    gpsRecorder.positionLayer.setLatLng([point.lat, point.lng]);
+  }
+
+  if (!gpsRecorder.accuracyLayer) {
+    gpsRecorder.accuracyLayer = L.circle([point.lat, point.lng], { radius: point.accuracy, color: "#168eea", weight: 1, fillOpacity: .08 }).addTo(gpsRecorder.map);
+  } else {
+    gpsRecorder.accuracyLayer.setLatLng([point.lat, point.lng]).setRadius(point.accuracy);
+  }
+}
+
+function gpsStartSegment(copyLastPoint = false) {
+  const segment = {
+    id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+    surfaceId: gpsRecorder.surfaceId,
+    qualityId: gpsRecorder.qualityId,
+    startedAt: new Date().toISOString(),
+    points: [],
+    layer: null
+  };
+  if (copyLastPoint && gpsRecorder.lastAccepted) segment.points.push({ ...gpsRecorder.lastAccepted });
+  gpsRecorder.segments.push(segment);
+  gpsRecorder.currentSegment = segment;
+  if (gpsRecorder.map) {
+    segment.layer = L.polyline(segment.points.map(point => [point.lat, point.lng]), gpsLineStyle(segment)).addTo(gpsRecorder.trackLayer);
+  }
+  return segment;
+}
+
+async function gpsRequestWakeLock() {
+  try {
+    if ("wakeLock" in navigator && !gpsRecorder.wakeLock) {
+      gpsRecorder.wakeLock = await navigator.wakeLock.request("screen");
+      gpsRecorder.wakeLock.addEventListener("release", () => { gpsRecorder.wakeLock = null; });
+    }
+  } catch (error) {
+    console.warn("Wake lock není dostupný:", error);
+  }
+}
+
+async function gpsReleaseWakeLock() {
+  try { await gpsRecorder.wakeLock?.release(); } catch (_) {}
+  gpsRecorder.wakeLock = null;
+}
+
+function gpsBeginWatch() {
+  if (!window.isSecureContext) {
+    gpsSetStatus("GPS je blokovaná — otevři stránku přes HTTPS", "idle");
+    toast("GPS funguje pouze přes HTTPS adresu.", "error");
+    return false;
+  }
+  if (!navigator.geolocation) {
+    gpsSetStatus("Tento prohlížeč nepodporuje GPS", "idle");
+    toast("Geolokace není v tomto prohlížeči dostupná.", "error");
+    return false;
+  }
+
+  if (gpsRecorder.watchId !== null) navigator.geolocation.clearWatch(gpsRecorder.watchId);
+  gpsRecorder.watchId = navigator.geolocation.watchPosition(
+    gpsOnPosition,
+    gpsOnError,
+    { enableHighAccuracy: true, maximumAge: 2500, timeout: 20000 }
+  );
+  return true;
+}
+
+function gpsStart() {
+  if (!gpsRecorder.surfaceId || !gpsRecorder.qualityId) {
+    return toast("Nejdřív musí být načtený povrch a kvalita.", "error");
+  }
+  if (gpsHasExportableData() && (gpsRecorder.mode === "stopped" || gpsRecorder.mode === "idle")) {
+    if (!confirm("Začít nový záznam? Dosavadní neexportovaná trasa bude smazána.")) return;
+    gpsResetData(false);
+  }
+  if (!gpsBeginWatch()) return;
+
+  gpsRecorder.mode = "recording";
+  gpsRecorder.centeredOnce = false;
+  gpsStartSegment(false);
+  const surface = gpsOption("surface", gpsRecorder.surfaceId)?.label || "povrch";
+  const quality = gpsOption("quality", gpsRecorder.qualityId)?.label || "kvalita";
+  gpsSetStatus(`Čekám na GPS · ${surface} · ${quality}`, "recording");
+  gpsUpdateButtons();
+  gpsRequestWakeLock();
+  gpsSaveDraft(false);
+}
+
+function gpsTogglePause() {
+  if (gpsRecorder.mode === "recording") {
+    if (gpsRecorder.watchId !== null) navigator.geolocation.clearWatch(gpsRecorder.watchId);
+    gpsRecorder.watchId = null;
+    gpsRecorder.mode = "paused";
+    gpsSetStatus("Záznam pozastaven", "paused");
+    gpsReleaseWakeLock();
+  } else if (gpsRecorder.mode === "paused") {
+    if (!gpsBeginWatch()) return;
+    gpsRecorder.mode = "recording";
+    gpsStartSegment(true);
+    gpsSetStatus("Záznam pokračuje", "recording");
+    gpsRequestWakeLock();
+  }
+  gpsUpdateButtons();
+  gpsSaveDraft(false);
+}
+
+function gpsStop() {
+  if (gpsRecorder.watchId !== null) navigator.geolocation.clearWatch(gpsRecorder.watchId);
+  gpsRecorder.watchId = null;
+  gpsRecorder.mode = "stopped";
+  gpsRecorder.currentSegment = null;
+  gpsReleaseWakeLock();
+  gpsUpdateButtons();
+  gpsUpdateStats();
+  gpsSaveDraft(false);
+}
+
+function gpsOnPosition(position) {
+  const point = {
+    lat: position.coords.latitude,
+    lng: position.coords.longitude,
+    accuracy: Number(position.coords.accuracy || 999),
+    altitude: Number.isFinite(position.coords.altitude) ? position.coords.altitude : null,
+    speed: Number.isFinite(position.coords.speed) ? position.coords.speed : null,
+    timestamp: new Date(position.timestamp || Date.now()).toISOString(),
+    timestampMs: Number(position.timestamp || Date.now())
+  };
+  gpsRecorder.lastLocation = point;
+  el("gpsAccuracy").textContent = `GPS: ±${Math.round(point.accuracy)} m`;
+  gpsUpdatePositionMarker();
+
+  if (!gpsRecorder.centeredOnce || gpsRecorder.mode === "recording") {
+    if (!gpsRecorder.centeredOnce) gpsRecorder.map?.setView([point.lat, point.lng], 18);
+    gpsRecorder.centeredOnce = true;
+  }
+
+  if (gpsRecorder.mode !== "recording") return;
+  if (point.accuracy > 45) {
+    gpsSetStatus(`Čekám na přesnější GPS (nyní ±${Math.round(point.accuracy)} m)`, "recording");
+    return;
+  }
+
+  const previous = gpsRecorder.lastAccepted;
+  if (previous) {
+    const distance = gpsDistanceBetween(previous, point);
+    const elapsed = point.timestampMs - previous.timestampMs;
+    if (distance < 3 && elapsed < 7000) return;
+    if (distance > 250 && elapsed < 15000) {
+      gpsSetStatus("Přeskočen podezřelý skok GPS", "recording");
+      return;
+    }
+    gpsRecorder.distanceM += distance;
+  }
+
+  if (!gpsRecorder.currentSegment) gpsStartSegment(!!previous);
+  gpsRecorder.currentSegment.points.push(point);
+  gpsRecorder.lastAccepted = point;
+
+  if (gpsRecorder.currentSegment.layer) {
+    gpsRecorder.currentSegment.layer.addLatLng([point.lat, point.lng]);
+  }
+
+  const surface = gpsOption("surface", gpsRecorder.surfaceId)?.label || "povrch";
+  const quality = gpsOption("quality", gpsRecorder.qualityId)?.label || "kvalita";
+  gpsSetStatus(`Zaznamenávám · ${surface} · ${quality}`, "recording");
+  gpsUpdateStats();
+  gpsSaveDraft(false);
+}
+
+function gpsOnError(error) {
+  const messages = {
+    1: "Přístup k poloze byl zamítnut. Povol GPS v nastavení webu.",
+    2: "Poloha není dostupná.",
+    3: "Vypršel čas čekání na GPS."
+  };
+  const message = messages[error.code] || error.message || "GPS chyba";
+  gpsSetStatus(message, gpsRecorder.mode);
+  toast(message, "error");
+}
+
+function gpsAddWarning(warningId) {
+  if (!gpsRecorder.lastLocation) {
+    return toast("Ještě nemám žádnou GPS polohu.", "error");
+  }
+  const location = gpsRecorder.lastLocation;
+  if (location.accuracy > 60 && !confirm(`Poloha je nepřesná (±${Math.round(location.accuracy)} m). Přesto uložit výstrahu?`)) return;
+
+  const option = gpsOption("warning", warningId);
+  const warning = {
+    id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+    warningId,
+    warningLabel: option?.label || "Výstraha",
+    lat: location.lat,
+    lng: location.lng,
+    accuracy: location.accuracy,
+    timestamp: new Date().toISOString(),
+    layer: null
+  };
+  gpsRecorder.warnings.push(warning);
+  if (gpsRecorder.map) {
+    warning.layer = L.marker([warning.lat, warning.lng], { icon: markerIcon(option) })
+      .bindPopup(`<b>${escapeHtml(warning.warningLabel)}</b><br>GPS záznam`)
+      .addTo(gpsRecorder.warningLayer)
+      .openPopup();
+  }
+  gpsUpdateStats();
+  gpsSaveDraft(false);
+  toast(`Výstraha „${warning.warningLabel}“ uložena.`, "success");
+}
+
+function gpsCenterOnPosition() {
+  if (!gpsRecorder.lastLocation) return toast("Ještě nemám GPS polohu.", "error");
+  gpsRecorder.map?.setView([gpsRecorder.lastLocation.lat, gpsRecorder.lastLocation.lng], 18);
+}
+
+function gpsSerializableData() {
+  return {
+    version: 2,
+    mode: gpsRecorder.mode === "recording" ? "paused" : gpsRecorder.mode,
+    surfaceId: gpsRecorder.surfaceId,
+    qualityId: gpsRecorder.qualityId,
+    segments: gpsRecorder.segments.map(segment => ({
+      id: segment.id,
+      surfaceId: segment.surfaceId,
+      qualityId: segment.qualityId,
+      startedAt: segment.startedAt,
+      points: segment.points
+    })),
+    warnings: gpsRecorder.warnings.map(({ layer, ...warning }) => warning),
+    lastLocation: gpsRecorder.lastLocation,
+    lastAccepted: gpsRecorder.lastAccepted,
+    distanceM: gpsRecorder.distanceM,
+    savedAt: new Date().toISOString()
+  };
+}
+
+function gpsSaveDraft(showToast = true) {
+  try {
+    localStorage.setItem(GPS_STORAGE_KEY, JSON.stringify(gpsSerializableData()));
+    if (showToast) toast("Rozpracovaný záznam byl uložen v telefonu.", "success");
+  } catch (error) {
+    console.error(error);
+    if (showToast) toast("Rozpracovaný záznam se nepodařilo uložit.", "error");
+  }
+}
+
+function gpsRestoreDraft() {
+  try {
+    const raw = localStorage.getItem(GPS_STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (saved.version !== 2) return;
+    gpsRecorder.mode = saved.mode || "idle";
+    gpsRecorder.surfaceId = saved.surfaceId || null;
+    gpsRecorder.qualityId = saved.qualityId || null;
+    gpsRecorder.segments = Array.isArray(saved.segments) ? saved.segments.map(segment => ({ ...segment, layer: null })) : [];
+    gpsRecorder.warnings = Array.isArray(saved.warnings) ? saved.warnings.map(warning => ({ ...warning, layer: null })) : [];
+    gpsRecorder.lastLocation = saved.lastLocation || null;
+    gpsRecorder.lastAccepted = saved.lastAccepted || null;
+    gpsRecorder.distanceM = Number(saved.distanceM || 0);
+    gpsRecorder.currentSegment = null;
+    gpsUpdateStats();
+    gpsUpdateButtons();
+    if (gpsHasExportableData()) gpsSetStatus("Obnoven rozpracovaný záznam", gpsRecorder.mode);
+  } catch (error) {
+    console.warn("Rozpracovaný GPS záznam se nepodařilo obnovit:", error);
+  }
+}
+
+function gpsResetData(ask = true) {
+  if (ask && gpsHasExportableData() && !confirm("Opravdu smazat celý rozpracovaný GPS záznam?")) return;
+  if (gpsRecorder.watchId !== null) navigator.geolocation.clearWatch(gpsRecorder.watchId);
+  gpsRecorder.watchId = null;
+  gpsRecorder.mode = "idle";
+  gpsRecorder.segments = [];
+  gpsRecorder.currentSegment = null;
+  gpsRecorder.warnings = [];
+  gpsRecorder.lastAccepted = null;
+  gpsRecorder.distanceM = 0;
+  gpsRecorder.trackLayer?.clearLayers();
+  gpsRecorder.warningLayer?.clearLayers();
+  localStorage.removeItem(GPS_STORAGE_KEY);
+  gpsReleaseWakeLock();
+  gpsSetStatus("Připraveno", "idle");
+  gpsUpdateStats();
+  gpsUpdateButtons();
+}
+
+function gpsExportGeoJson() {
+  const features = [];
+  for (const segment of gpsRecorder.segments) {
+    if (segment.points.length < 2) continue;
+    const surface = gpsOption("surface", segment.surfaceId);
+    const quality = gpsOption("quality", segment.qualityId);
+    features.push({
+      type: "Feature",
+      geometry: { type: "LineString", coordinates: segment.points.map(point => [point.lng, point.lat]) },
+      properties: {
+        kind: "line",
+        title: null,
+        note: "Zaznamenáno GPS nástrojem ESK8",
+        surface: surface?.label || null,
+        surface_option_id: segment.surfaceId || null,
+        quality: quality?.label || null,
+        quality_option_id: segment.qualityId || null,
+        source: "esk8-gps-recorder",
+        recorded_at: segment.startedAt,
+        point_count: segment.points.length,
+        timestamps: segment.points.map(point => point.timestamp),
+        accuracies: segment.points.map(point => point.accuracy)
+      }
+    });
+  }
+
+  for (const warning of gpsRecorder.warnings) {
+    const option = gpsOption("warning", warning.warningId);
+    features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [warning.lng, warning.lat] },
+      properties: {
+        kind: "warning",
+        title: null,
+        note: "Zaznamenáno GPS nástrojem ESK8",
+        warning: option?.label || warning.warningLabel || "Výstraha",
+        warning_option_id: warning.warningId || null,
+        source: "esk8-gps-recorder",
+        recorded_at: warning.timestamp,
+        accuracy: warning.accuracy
+      }
+    });
+  }
+
+  if (!features.length) return toast("Není co exportovat.", "error");
+  const collection = {
+    type: "FeatureCollection",
+    name: "ESK8 GPS záznam",
+    exported_at: new Date().toISOString(),
+    properties: { distance_m: Math.round(gpsRecorder.distanceM) },
+    features
+  };
+  const blob = new Blob([JSON.stringify(collection, null, 2)], { type: "application/geo+json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  link.href = url;
+  link.download = `esk8-gps-${stamp}.geojson`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  toast(`GeoJSON exportován (${features.length} prvků).`, "success");
+}
+
+window.addEventListener("resize", () => {
+  if (!el("gpsRecorderPage").classList.contains("hidden")) {
+    setTimeout(() => gpsRecorder.map?.invalidateSize(), 80);
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && gpsRecorder.mode === "recording") gpsRequestWakeLock();
+});
+
 /* UI */
+
+el("gpsRecorderBtn").onclick = gpsOpenPage;
+el("closeGpsRecorderBtn").onclick = gpsClosePage;
+el("gpsStartBtn").onclick = gpsStart;
+el("gpsPauseBtn").onclick = gpsTogglePause;
+el("gpsStopBtn").onclick = gpsStop;
+el("gpsExportBtn").onclick = gpsExportGeoJson;
+el("clearGpsRecorderBtn").onclick = () => gpsResetData(true);
+el("gpsCenterBtn").onclick = gpsCenterOnPosition;
+el("gpsSaveDraftBtn").onclick = () => gpsSaveDraft(true);
 el("authBtn").addEventListener("click", async () => {
   if (state.session) {
     await sb.auth.signOut();
@@ -1376,13 +2097,18 @@ sb.auth.onAuthStateChange(async (_event, session) => {
     }
     renderAuthUi();
     await loadFeatures();
-    if (!session) closePanels();
+    if (!session) {
+      closePanels();
+      if (gpsRecorder.mode === "recording" || gpsRecorder.mode === "paused") gpsStop();
+      gpsClosePage();
+    }
   } catch (e) {
     console.error(e);
     toast(e.message, "error");
   }
 });
 
+gpsRestoreDraft();
 initialize();
 </script>
 </body>
