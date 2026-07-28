@@ -141,72 +141,103 @@
 
 
 
-    /* GPS MAPOVÁNÍ — samostatná podstránka uvnitř aplikace */
+    /* GPS MAPOVÁNÍ — kompaktní ovládání bez nutnosti posouvání */
     .gps-page{
       position:fixed;z-index:1800;inset:0;background:var(--bg);color:var(--text);
       display:flex;flex-direction:column;overflow:hidden
     }
     .gps-page-head{
-      flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:10px 12px;
-      padding-top:max(10px,env(safe-area-inset-top));background:#081522;
-      border-bottom:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.24)
+      flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:6px 8px;
+      padding-top:max(6px,env(safe-area-inset-top));min-height:44px;background:#081522;
+      border-bottom:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.24)
     }
+    .gps-page-head .btn{min-height:34px;padding:6px 8px}
     .gps-page-title{min-width:0;flex:1}
-    .gps-page-title b{display:block;font-size:16px}
-    .gps-page-title span{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .gps-page-title b{display:block;font-size:14px;line-height:1.15}
+    .gps-page-title span{display:block;color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .gps-actions{
-      flex:0 0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;
-      padding:10px 12px;background:#091728;border-bottom:1px solid var(--line)
+      flex:0 0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;
+      padding:5px 8px;background:#091728;border-bottom:1px solid var(--line)
     }
-    .gps-actions .btn{min-height:48px;padding:8px 6px;font-weight:800}
+    .gps-actions .btn{min-height:42px;padding:5px 3px;font-size:12px;font-weight:850;border-radius:10px}
     .gps-actions .gps-start{background:#0e4d2c;border-color:#1f9c58;color:#d9ffe8}
     .gps-actions .gps-pause{background:#4a3313;border-color:#9a641d;color:#ffe9bd}
     .gps-actions .gps-stop{background:#4a1822;border-color:#9b3045;color:#ffdbe2}
     .gps-actions .gps-export{background:#0d4b6d;border-color:#188cc7;color:#e2f6ff}
-    #gpsRecorderMap{flex:0 0 clamp(260px,34vh,420px);width:100%;background:#dfe7ee;overflow:hidden;isolation:isolate}
+
+    #gpsRecorderMap{
+      flex:0 0 clamp(150px,25vh,230px);width:100%;min-height:0;
+      background:#dfe7ee;overflow:hidden;isolation:isolate
+    }
+
     .gps-statusbar{
-      flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px;
+      flex:0 0 auto;display:flex;align-items:center;gap:6px;min-height:31px;padding:5px 8px;
       background:#081522;border-top:1px solid var(--line);border-bottom:1px solid var(--line)
     }
-    .gps-status-dot{width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.15)}
-    .gps-status-dot.recording{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.17)}
-    .gps-status-dot.paused{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.17)}
-    .gps-status-text{font-size:13px;flex:1}
-    .gps-accuracy{font-size:12px;color:var(--muted)}
-    .gps-local-warning{padding:9px 14px;background:#7c2d12;color:#ffedd5;font-size:12px;border-bottom:1px solid #b45309}
-    .gps-scroll{flex:1;min-height:0;overflow:auto;padding:12px;padding-bottom:max(18px,env(safe-area-inset-bottom))}
-    .gps-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
-    .gps-stat{border:1px solid var(--line);border-radius:14px;background:#0b1a2b;padding:10px;text-align:center}
-    .gps-stat strong{display:block;font-size:20px}
-    .gps-stat span{display:block;font-size:10px;color:var(--muted);margin-top:2px}
-    .gps-section{margin-bottom:16px}
-    .gps-section-head{display:flex;align-items:end;gap:8px;margin-bottom:8px}
-    .gps-section-head h3{margin:0;font-size:15px}
-    .gps-section-head span{font-size:11px;color:var(--muted)}
-    .gps-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-    .gps-choice{
-      min-height:60px;border:1px solid var(--line);border-radius:14px;background:#102138;color:var(--text);
-      padding:8px 7px;font-weight:750;display:flex;align-items:center;justify-content:center;gap:6px;text-align:center
+    .gps-status-dot{width:9px;height:9px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 2px rgba(239,68,68,.15)}
+    .gps-status-dot.recording{background:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.17)}
+    .gps-status-dot.paused{background:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.17)}
+    .gps-status-text{font-size:11px;line-height:1.15;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .gps-accuracy{font-size:10px;color:var(--muted);white-space:nowrap}
+    .gps-local-warning{padding:5px 8px;background:#7c2d12;color:#ffedd5;font-size:10px;border-bottom:1px solid #b45309}
+
+    .gps-scroll{
+      flex:1;min-height:0;overflow:hidden;padding:6px 8px max(6px,env(safe-area-inset-bottom));
+      display:grid;grid-template-rows:auto auto auto auto auto;gap:5px;align-content:start
     }
-    .gps-choice.active{border-color:#38bdf8;background:#104967;box-shadow:0 0 0 3px rgba(56,189,248,.22)}
-    .gps-choice.warning-choice{min-height:68px;flex-direction:column;font-size:12px}
-    .gps-choice.warning-choice .marker-preview{width:24px;height:24px}
-    .gps-choice.warning-choice svg{width:23px;height:23px}
-    .gps-footer-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:2px}
-    .gps-mini-note{margin-top:9px;font-size:11px;color:var(--muted);line-height:1.45}
+    .gps-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:0}
+    .gps-stat{border:1px solid var(--line);border-radius:9px;background:#0b1a2b;padding:4px 3px;text-align:center;min-height:32px}
+    .gps-stat strong{display:block;font-size:14px;line-height:1.05}
+    .gps-stat span{display:block;font-size:8px;color:var(--muted);margin-top:1px}
+
+    .gps-section{
+      margin:0;display:grid;grid-template-columns:58px minmax(0,1fr);gap:6px;align-items:start
+    }
+    .gps-section-head{display:block;margin:0;padding-top:5px;min-width:0}
+    .gps-section-head h3{margin:0;font-size:11px;line-height:1.1;color:#cfe4f7}
+    .gps-section-head span{display:none}
+    .gps-choice-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+    .gps-choice{
+      min-width:0;min-height:36px;border:1px solid var(--line);border-radius:9px;background:#102138;color:var(--text);
+      padding:3px 2px;font-size:10px;line-height:1.05;font-weight:800;display:flex;align-items:center;
+      justify-content:center;gap:3px;text-align:center;overflow:hidden
+    }
+    .gps-choice.active{border-color:#38bdf8;background:#104967;box-shadow:0 0 0 2px rgba(56,189,248,.20)}
+    .gps-choice.warning-choice{min-height:39px;flex-direction:row;font-size:9px}
+    .gps-choice.warning-choice .marker-preview{width:17px;height:17px;flex:0 0 17px}
+    .gps-choice.warning-choice svg{width:17px;height:17px}
+    .gps-choice.warning-choice span:last-child{overflow:hidden;text-overflow:ellipsis}
+
+    .gps-footer-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:0}
+    .gps-footer-actions .btn{min-width:0;min-height:34px;padding:4px 3px;font-size:9px;line-height:1.05;border-radius:9px}
+    .gps-mini-note{display:none}
     .gps-position-marker{width:20px;height:20px;border-radius:50%;background:#168eea;border:4px solid white;box-shadow:0 2px 10px rgba(0,0,0,.5)}
     .gps-open-btn .short-label{display:none}
 
     @media (max-width:760px){
       .gps-open-btn .long-label{display:none}
       .gps-open-btn .short-label{display:inline}
-      .gps-page-head{padding-left:8px;padding-right:8px}
-      .gps-actions{padding:8px;gap:6px}
-      .gps-actions .btn{font-size:12px;min-height:52px}
-      #gpsRecorderMap{flex-basis:32vh;min-height:250px}
-      .gps-scroll{padding:10px}
-      .gps-choice-grid{gap:7px}
-      .gps-choice{font-size:14px;min-height:58px}
+      .gps-page-title span{display:none}
+    }
+
+    @media (max-height:720px){
+      #gpsRecorderMap{flex-basis:20vh;min-height:120px;max-height:165px}
+      .gps-page-head{min-height:39px;padding-top:max(4px,env(safe-area-inset-top));padding-bottom:4px}
+      .gps-actions .btn{min-height:37px}
+      .gps-scroll{gap:3px;padding-top:4px}
+      .gps-stat{min-height:27px;padding:2px}
+      .gps-stat strong{font-size:12px}
+      .gps-choice{min-height:31px;font-size:9px}
+      .gps-choice.warning-choice{min-height:33px}
+      .gps-footer-actions .btn{min-height:30px}
+    }
+
+    @media (max-width:370px){
+      .gps-section{grid-template-columns:49px minmax(0,1fr);gap:4px}
+      .gps-choice-grid{gap:3px}
+      .gps-choice{font-size:8.5px}
+      .gps-actions .btn{font-size:10px}
+      .gps-footer-actions .btn{font-size:8px}
     }
 
     @media (max-width:760px){
@@ -242,7 +273,7 @@
 
 
   <!-- GPS MAPOVÁNÍ: samostatná podstránka, data zůstávají v telefonu do exportu -->
-  <section id="gpsRecorderPage" class="gps-page hidden" aria-label="GPS záznam trasy">
+  <section id="gpsRecorderPage" class="gps-page gps-compact hidden" aria-label="GPS záznam trasy">
     <div class="gps-page-head">
       <button id="closeGpsRecorderBtn" class="btn ghost small">← Mapa</button>
       <div class="gps-page-title">
@@ -294,8 +325,9 @@
       </div>
 
       <div class="gps-footer-actions">
-        <button id="gpsCenterBtn" class="btn small">◎ Moje poloha</button>
-        <button id="gpsSaveDraftBtn" class="btn small ghost">Uložit rozpracované</button>
+        <button id="gpsPermissionBtn" class="btn small primary" title="Povolit přístup k poloze">📍 Poloha</button>
+        <button id="gpsCenterBtn" class="btn small" title="Vycentrovat mapu na moji polohu">◎ Vycentrovat</button>
+        <button id="gpsSaveDraftBtn" class="btn small ghost" title="Uložit rozpracovaný záznam do telefonu">💾 Uložit</button>
       </div>
       <div class="gps-mini-note">
         Záznam se průběžně ukládá v tomto telefonu. Export vytváří linie s vlastnostmi <b>surface</b> a <b>quality</b> a body s vlastností <b>warning</b>, takže je lze nahrát přes existující GeoJSON import ve správě mapy.
@@ -1456,7 +1488,10 @@ const gpsRecorder = {
   lastAccepted: null,
   distanceM: 0,
   centeredOnce: false,
-  wakeLock: null
+  wakeLock: null,
+  permissionStatus: null,
+  permissionState: "unknown",
+  locating: false
 };
 
 function gpsOption(kind, id) {
@@ -1592,7 +1627,106 @@ function gpsInitMap() {
   gpsRebuildMapLayers();
 }
 
-function gpsOpenPage() {
+function gpsUpdatePermissionUi(permissionState = gpsRecorder.permissionState) {
+  gpsRecorder.permissionState = permissionState || "unknown";
+  const button = el("gpsPermissionBtn");
+  if (!button) return;
+
+  if (!window.isSecureContext) {
+    button.textContent = "GPS vyžaduje HTTPS";
+    button.disabled = true;
+    return;
+  }
+  if (!navigator.geolocation) {
+    button.textContent = "GPS nepodporována";
+    button.disabled = true;
+    return;
+  }
+
+  button.disabled = gpsRecorder.locating;
+  if (gpsRecorder.locating) button.textContent = "📍 Zjišťuji polohu…";
+  else if (gpsRecorder.permissionState === "granted") button.textContent = "✓ Poloha povolena";
+  else if (gpsRecorder.permissionState === "denied") button.textContent = "⚠ Poloha zakázána";
+  else button.textContent = "📍 Povolit polohu";
+}
+
+async function gpsQueryPermission() {
+  if (!window.isSecureContext) {
+    gpsUpdatePermissionUi("unavailable");
+    return "unavailable";
+  }
+  if (!navigator.geolocation) {
+    gpsUpdatePermissionUi("unsupported");
+    return "unsupported";
+  }
+  if (!navigator.permissions?.query) {
+    gpsUpdatePermissionUi("unknown");
+    return "unknown";
+  }
+
+  try {
+    const status = await navigator.permissions.query({ name: "geolocation" });
+    gpsRecorder.permissionStatus = status;
+    gpsUpdatePermissionUi(status.state);
+    status.onchange = () => {
+      gpsUpdatePermissionUi(status.state);
+      if (status.state === "denied") {
+        gpsSetStatus("Poloha je v prohlížeči zakázána", gpsRecorder.mode);
+      }
+    };
+    return status.state;
+  } catch (error) {
+    console.warn("Stav oprávnění polohy nelze zjistit:", error);
+    gpsUpdatePermissionUi("unknown");
+    return "unknown";
+  }
+}
+
+function gpsRequestCurrentPosition({ center = true, showErrorToast = true } = {}) {
+  if (!window.isSecureContext) {
+    gpsSetStatus("GPS je blokovaná — otevři web přes HTTPS", "idle");
+    gpsUpdatePermissionUi("unavailable");
+    if (showErrorToast) toast("Poloha funguje pouze na HTTPS adrese.", "error");
+    return Promise.resolve({ ok: false, code: "insecure" });
+  }
+  if (!navigator.geolocation) {
+    gpsSetStatus("Tento prohlížeč nepodporuje GPS", "idle");
+    gpsUpdatePermissionUi("unsupported");
+    if (showErrorToast) toast("Geolokace není v tomto prohlížeči dostupná.", "error");
+    return Promise.resolve({ ok: false, code: "unsupported" });
+  }
+  if (gpsRecorder.locating) return Promise.resolve({ ok: false, code: "busy" });
+
+  gpsRecorder.locating = true;
+  gpsUpdatePermissionUi(gpsRecorder.permissionState);
+  gpsSetStatus("Žádám o přístup k poloze…", gpsRecorder.mode);
+
+  return new Promise(resolve => {
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        gpsRecorder.locating = false;
+        gpsUpdatePermissionUi("granted");
+        gpsOnPosition(position);
+        if (center && gpsRecorder.lastLocation) {
+          gpsRecorder.map?.setView([gpsRecorder.lastLocation.lat, gpsRecorder.lastLocation.lng], 18);
+          gpsRecorder.centeredOnce = true;
+        }
+        if (gpsRecorder.mode !== "recording") gpsSetStatus("Poloha načtena", "idle");
+        resolve({ ok: true, code: 0 });
+      },
+      error => {
+        gpsRecorder.locating = false;
+        if (error.code === 1) gpsUpdatePermissionUi("denied");
+        else gpsUpdatePermissionUi(gpsRecorder.permissionState);
+        gpsOnError(error, showErrorToast);
+        resolve({ ok: false, code: error.code });
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 25000 }
+    );
+  });
+}
+
+async function gpsOpenPage() {
   if (!state.session) {
     el("authModal").classList.remove("hidden");
     toast("GPS záznam je dostupný pouze po přihlášení.", "error");
@@ -1605,6 +1739,14 @@ function gpsOpenPage() {
   gpsUpdateStats();
   gpsUpdateButtons();
   setTimeout(() => gpsRecorder.map.invalidateSize(), 80);
+
+  const permission = await gpsQueryPermission();
+  if (permission === "denied") {
+    gpsSetStatus("Poloha je zakázána — povol ji v nastavení webu", "idle");
+    toast("Poloha je pro tento web zakázaná. V Chromu klepni na ikonu zámku / nastavení webu a povol Polohu.", "error");
+  } else if (permission !== "unavailable" && permission !== "unsupported") {
+    await gpsRequestCurrentPosition({ center: true, showErrorToast: permission === "prompt" });
+  }
 }
 
 function gpsClosePage() {
@@ -1712,13 +1854,23 @@ function gpsBeginWatch() {
   return true;
 }
 
-function gpsStart() {
+async function gpsStart() {
   if (!gpsRecorder.surfaceId || !gpsRecorder.qualityId) {
     return toast("Nejdřív musí být načtený povrch a kvalita.", "error");
   }
   if (gpsHasExportableData() && (gpsRecorder.mode === "stopped" || gpsRecorder.mode === "idle")) {
     if (!confirm("Začít nový záznam? Dosavadní neexportovaná trasa bude smazána.")) return;
     gpsResetData(false);
+  }
+
+  const permission = await gpsQueryPermission();
+  if (permission === "denied") {
+    gpsSetStatus("Poloha je zakázána — povol ji v nastavení webu", "idle");
+    return toast("Chrome má pro tento web zakázanou polohu. Otevři nastavení webu a nastav Polohu na Povolit.", "error");
+  }
+  if (!gpsRecorder.lastLocation && permission !== "granted") {
+    const result = await gpsRequestCurrentPosition({ center: true, showErrorToast: true });
+    if (!result.ok && result.code === 1) return;
   }
   if (!gpsBeginWatch()) return;
 
@@ -1814,7 +1966,7 @@ function gpsOnPosition(position) {
   gpsSaveDraft(false);
 }
 
-function gpsOnError(error) {
+function gpsOnError(error, showToast = true) {
   const messages = {
     1: "Přístup k poloze byl zamítnut. Povol GPS v nastavení webu.",
     2: "Poloha není dostupná.",
@@ -1822,7 +1974,7 @@ function gpsOnError(error) {
   };
   const message = messages[error.code] || error.message || "GPS chyba";
   gpsSetStatus(message, gpsRecorder.mode);
-  toast(message, "error");
+  if (showToast) toast(message, "error");
 }
 
 function gpsAddWarning(warningId) {
@@ -1855,8 +2007,11 @@ function gpsAddWarning(warningId) {
   toast(`Výstraha „${warning.warningLabel}“ uložena.`, "success");
 }
 
-function gpsCenterOnPosition() {
-  if (!gpsRecorder.lastLocation) return toast("Ještě nemám GPS polohu.", "error");
+async function gpsCenterOnPosition() {
+  if (!gpsRecorder.lastLocation) {
+    const result = await gpsRequestCurrentPosition({ center: true, showErrorToast: true });
+    if (!result.ok) return;
+  }
   gpsRecorder.map?.setView([gpsRecorder.lastLocation.lat, gpsRecorder.lastLocation.lng], 18);
 }
 
@@ -2017,6 +2172,15 @@ el("gpsPauseBtn").onclick = gpsTogglePause;
 el("gpsStopBtn").onclick = gpsStop;
 el("gpsExportBtn").onclick = gpsExportGeoJson;
 el("clearGpsRecorderBtn").onclick = () => gpsResetData(true);
+el("gpsPermissionBtn").onclick = async () => {
+  const permission = await gpsQueryPermission();
+  if (permission === "denied") {
+    gpsSetStatus("Poloha je zakázána — povol ji v nastavení webu", "idle");
+    toast("V Chromu otevři informace o webu → Oprávnění → Poloha → Povolit. Potom stránku obnov.", "error");
+    return;
+  }
+  await gpsRequestCurrentPosition({ center: true, showErrorToast: true });
+};
 el("gpsCenterBtn").onclick = gpsCenterOnPosition;
 el("gpsSaveDraftBtn").onclick = () => gpsSaveDraft(true);
 el("authBtn").addEventListener("click", async () => {
