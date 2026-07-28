@@ -247,6 +247,83 @@
       .legend{bottom:10px;right:10px;max-height:110px;overflow:auto}
       .hide-mobile{display:none!important}
     }
+  
+    /* PŘÍJEMNĚJŠÍ HORNÍ MENU PRO MOBIL */
+    .brand-copy{min-width:0}
+    .top-action-icon{font-size:18px;line-height:1}
+    .mobile-menu-toggle,.mobile-menu-backdrop{display:none}
+    .mobile-menu{display:contents}
+
+    @media (max-width:760px){
+      .topbar{
+        left:8px;right:8px;top:8px;height:58px;padding:7px 8px;gap:6px;
+        border-radius:18px;background:rgba(7,17,31,.95)
+      }
+      .brand{flex:1;gap:7px;min-width:0}
+      .brand-badge{width:38px;height:38px;flex:0 0 38px;border-radius:12px;font-size:16px}
+      .brand-copy{min-width:0}
+      .brand-title{
+        max-width:104px;font-size:14px;line-height:1.1;overflow:hidden;
+        text-overflow:ellipsis;white-space:nowrap
+      }
+      .brand-sub,.status,.top-spacer{display:none}
+
+      .top-quick,.mobile-menu-toggle{
+        flex:0 0 auto;height:42px;min-width:44px;padding:0 9px;border-radius:13px;
+        font-size:12px;font-weight:800;white-space:nowrap
+      }
+      .top-quick{gap:4px}
+      .top-action-icon{font-size:19px}
+      .gps-open-btn .long-label{display:none}
+      .gps-open-btn .short-label{display:inline}
+      #editorBtn{padding-inline:10px}
+
+      .mobile-menu-toggle{
+        display:inline-flex;font-size:22px;line-height:1;background:#102138;
+        border-color:#31475f
+      }
+      .mobile-menu-toggle[aria-expanded="true"]{
+        background:#18314d;border-color:#4f6b89
+      }
+
+      .mobile-menu{
+        display:none;position:absolute;z-index:30;right:0;top:calc(100% + 8px);
+        width:min(250px,calc(100vw - 16px));padding:8px;gap:6px;
+        flex-direction:column;border:1px solid rgba(255,255,255,.12);
+        border-radius:17px;background:rgba(7,17,31,.985);
+        box-shadow:0 18px 46px rgba(0,0,0,.48);backdrop-filter:blur(18px)
+      }
+      .mobile-menu.open{display:flex}
+      .mobile-menu .btn{
+        width:100%;min-height:46px;padding:10px 13px;justify-content:flex-start;
+        border-radius:12px;font-size:14px;font-weight:750
+      }
+      .mobile-menu .btn::before{
+        width:24px;display:inline-grid;place-items:center;font-size:18px;
+        color:#8ed6ff
+      }
+      #myFeaturesBtn::before{content:"▤"}
+      #adminBtn::before{content:"⚙"}
+      #authBtn::before{content:"↪"}
+      #authBtn{border-color:#3e5874;background:#102138}
+
+      .mobile-menu-backdrop{
+        position:fixed;z-index:1190;inset:0;display:block;
+        background:rgba(0,0,0,.28);backdrop-filter:blur(1px)
+      }
+      .mobile-menu-backdrop.hidden{display:none!important}
+
+      .panel{top:76px}
+    }
+
+    @media (max-width:390px){
+      .brand-title{max-width:76px;font-size:13px}
+      .topbar{gap:5px}
+      .top-quick,.mobile-menu-toggle{min-width:41px;padding-inline:7px}
+      #editorBtn span:last-child{display:none}
+      #editorBtn{width:43px}
+    }
+
   </style>
 </head>
 <body>
@@ -256,19 +333,36 @@
   <header class="topbar">
     <div class="brand">
       <div class="brand-badge">E8</div>
-      <div>
+      <div class="brand-copy">
         <div class="brand-title">ESK8 mapa</div>
         <div class="brand-sub">Povrchy, kvalita a výstrahy</div>
       </div>
     </div>
+
     <div class="top-spacer"></div>
     <div id="connectionStatus" class="status">Načítám mapu…</div>
-    <button id="gpsRecorderBtn" class="btn ghost gps-open-btn hidden" title="GPS mapování"><span class="long-label">● GPS záznam</span><span class="short-label">● GPS</span></button>
-    <button id="myFeaturesBtn" class="btn ghost hidden">Moje prvky</button>
-    <button id="adminBtn" class="btn ghost hidden">Správa</button>
-    <button id="editorBtn" class="btn primary hidden">Editor</button>
-    <button id="authBtn" class="btn">Přihlásit</button>
+
+    <button id="gpsRecorderBtn" class="btn ghost gps-open-btn top-quick hidden" title="GPS mapování">
+      <span class="top-action-icon">◎</span>
+      <span class="long-label">GPS záznam</span>
+      <span class="short-label">GPS</span>
+    </button>
+
+    <button id="editorBtn" class="btn primary top-quick hidden" title="Otevřít editor">
+      <span class="top-action-icon">✎</span>
+      <span>Editor</span>
+    </button>
+
+    <button id="mobileMenuBtn" class="btn ghost mobile-menu-toggle" type="button"
+      aria-label="Otevřít nabídku" aria-controls="mobileMenu" aria-expanded="false">☰</button>
+
+    <div id="mobileMenu" class="mobile-menu" aria-label="Hlavní nabídka">
+      <button id="myFeaturesBtn" class="btn ghost hidden">Moje prvky</button>
+      <button id="adminBtn" class="btn ghost hidden">Správa</button>
+      <button id="authBtn" class="btn">Přihlásit</button>
+    </div>
   </header>
+  <div id="mobileMenuBackdrop" class="mobile-menu-backdrop hidden"></div>
 
 
 
@@ -2273,6 +2367,39 @@ sb.auth.onAuthStateChange(async (_event, session) => {
 });
 
 gpsRestoreDraft();
+
+/* Mobilní horní nabídka */
+function setMobileMenu(open) {
+  const menu = el("mobileMenu");
+  const button = el("mobileMenuBtn");
+  const backdrop = el("mobileMenuBackdrop");
+  if (!menu || !button || !backdrop) return;
+
+  const shouldOpen = !!open && window.matchMedia("(max-width: 760px)").matches;
+  menu.classList.toggle("open", shouldOpen);
+  button.setAttribute("aria-expanded", String(shouldOpen));
+  button.setAttribute("aria-label", shouldOpen ? "Zavřít nabídku" : "Otevřít nabídku");
+  backdrop.classList.toggle("hidden", !shouldOpen);
+}
+
+el("mobileMenuBtn")?.addEventListener("click", event => {
+  event.stopPropagation();
+  setMobileMenu(!el("mobileMenu").classList.contains("open"));
+});
+el("mobileMenuBackdrop")?.addEventListener("click", () => setMobileMenu(false));
+
+["gpsRecorderBtn", "editorBtn", "myFeaturesBtn", "adminBtn", "authBtn"].forEach(id => {
+  el(id)?.addEventListener("click", () => setMobileMenu(false));
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") setMobileMenu(false);
+});
+
+window.addEventListener("resize", () => {
+  if (!window.matchMedia("(max-width: 760px)").matches) setMobileMenu(false);
+});
+
 initialize();
 </script>
 </body>
