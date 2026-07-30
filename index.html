@@ -1545,6 +1545,11 @@ function renderGeoJsonViewer(viewer, collection, fileName) {
     .list{flex:1;overflow:auto;padding:8px}.item{width:100%;display:block;text-align:left;margin:0 0 6px;padding:9px;border:1px solid var(--line);border-radius:11px;background:#0a1828;color:var(--text)}.item.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(58,167,255,.18)}
     .item-title{font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.item-meta{margin-top:3px;color:var(--muted);font-size:10px}.empty{padding:20px;text-align:center;color:var(--muted);font-size:12px}
     #map{height:100%;width:100%;background:#dfe7ee}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0d1b2c;color:var(--text)}.popup-title{font-weight:850;margin-bottom:7px}.prop{font-size:11px;margin:3px 0;word-break:break-word}.prop b{color:#fff}
+    .viewer-warning-marker,.viewer-surface-marker{background:transparent!important;border:0!important}
+    .viewer-warning-icon{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#fff;border:3px solid #ef4444;box-shadow:0 3px 12px rgba(0,0,0,.35);color:#cf1f36}
+    .viewer-warning-icon svg{width:20px;height:20px}
+    .viewer-surface-symbol{width:20px;height:20px;display:grid;place-items:center;color:#111827;pointer-events:none}
+    .viewer-surface-symbol svg{width:18px;height:18px;overflow:visible;filter:drop-shadow(0 1px 1px rgba(255,255,255,.9)) drop-shadow(0 1px 1px rgba(0,0,0,.7))}
     .viewer-note{position:absolute;z-index:900;left:50%;top:10px;transform:translateX(-50%);pointer-events:none;background:rgba(7,17,31,.92);color:#cfe4f7;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:7px 11px;font-size:11px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
     @media(max-width:760px){.app{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 230px}.side{grid-row:2;border-right:0;border-top:1px solid var(--line)}.head{padding:7px 9px}.title{font-size:13px}.safe{font-size:9px}.stats{position:absolute;right:8px;bottom:238px;z-index:950;width:190px;margin:0}.stat{background:rgba(7,17,31,.92)}.tools{padding:6px}.list{padding:6px;display:flex;gap:6px;overflow:auto}.item{flex:0 0 190px;margin:0}.viewer-note{top:7px;font-size:9px}}
   </style>
@@ -1559,6 +1564,7 @@ function renderGeoJsonViewer(viewer, collection, fileName) {
   <main style="position:relative;min-width:0;min-height:0"><div class="viewer-note">Podklad v této kartě · online mapu překresluj v původní kartě</div><div id="map"></div></main>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"><\/script>
 <script>
 "use strict";
 const collection = ${serializedData};
@@ -1567,13 +1573,20 @@ const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&
 const features = Array.isArray(collection.features) ? collection.features : [];
 const map = L.map("map",{preferCanvas:true,zoomControl:true}).setView([50.0755,14.4378],12);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,maxNativeZoom:19,attribution:"&copy; OpenStreetMap"}).addTo(map);
-const layerByIndex=new Map(),itemByIndex=new Map(),allGroup=L.featureGroup().addTo(map);
+const layerByIndex=new Map(),itemByIndex=new Map(),allGroup=L.featureGroup().addTo(map),symbolGroup=L.layerGroup().addTo(map);
 function propertyValue(properties,keys){for(const key of keys){const value=properties?.[key];if(value!==undefined&&value!==null&&String(value).trim())return String(value)}return ""}
 function featureTitle(feature,index){const p=feature?.properties||{};return propertyValue(p,["title","name","nazev","warning","vystraha","surface","povrch"])||(feature?.geometry?.type==="Point"?"Bod "+(index+1):"Úsek "+(index+1))}
-function lineColor(feature){const q=propertyValue(feature?.properties,["quality","kvalita"]).toLocaleLowerCase("cs-CZ");if(q.includes("výborn")||q.includes("hlad"))return "#22c55e";if(q.includes("dobr"))return "#84cc16";if(q.includes("horš")||q.includes("prům"))return "#f59e0b";if(q.includes("špat")||q.includes("výtluk"))return "#ef4444";if(q.includes("nesjízd")||q.includes("nebezpe"))return "#0f172a";return "#3aa7ff"}
+function lineColor(feature){const explicit=propertyValue(feature?.properties,["stroke","color"]);if(/^#[0-9a-f]{3,8}$/i.test(explicit))return explicit;const q=propertyValue(feature?.properties,["quality","kvalita"]).toLocaleLowerCase("cs-CZ");if(q.includes("výborn")||q.includes("hlad"))return "#22c55e";if(q.includes("dobr"))return "#84cc16";if(q.includes("horš")||q.includes("prům"))return "#f59e0b";if(q.includes("špat")||q.includes("výtluk"))return "#ef4444";if(q.includes("nesjízd")||q.includes("nebezpe"))return "#0f172a";return "#3aa7ff"}
+function warningSvg(name){const common='viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"';const icons={warning:'<svg '+common+'><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 8v6"/><path d="M12 17.5h.01"/></svg>',bump:'<svg '+common+'><path d="M3 16h18"/><path d="M6 16c1.5-5 10.5-5 12 0"/></svg>',rail:'<svg '+common+'><path d="m5 5 14 14"/><path d="m19 5-14 14"/><path d="M8 2v4"/><path d="M16 18v4"/></svg>',barrier:'<svg '+common+'><path d="M5 20v-7"/><path d="M19 20v-7"/><path d="M4 10h16v4H4z"/><path d="m7 10 3 4m2-4 3 4"/></svg>',hole:'<svg '+common+'><ellipse cx="12" cy="15" rx="8" ry="4"/><path d="M7 12c1-4 9-4 10 0"/></svg>'};return icons[name]||icons.warning}
+function warningIconKey(feature){const p=feature?.properties||{};const explicit=propertyValue(p,["warning_icon","marker-symbol","icon"]).toLocaleLowerCase("cs-CZ");if(["warning","bump","rail","barrier","hole"].includes(explicit))return explicit;const label=propertyValue(p,["warning","vystraha","title","name"]).toLocaleLowerCase("cs-CZ");if(label.includes("závor")||label.includes("zavor"))return "barrier";if(label.includes("kolej")||label.includes("přejezd")||label.includes("prejezd"))return "rail";if(label.includes("díra")||label.includes("dira")||label.includes("výtluk")||label.includes("vytluk"))return "hole";if(label.includes("nerov")||label.includes("retard")||label.includes("práh")||label.includes("prah"))return "bump";return "warning"}
+function warningMarkerIcon(feature){const key=warningIconKey(feature);return L.divIcon({className:"viewer-warning-marker",html:'<div class="viewer-warning-icon">'+warningSvg(key)+'</div>',iconSize:[34,34],iconAnchor:[17,17],popupAnchor:[0,-16]})}
+function surfaceKeyForFeature(feature){const p=feature?.properties||{};const explicit=propertyValue(p,["surface_symbol"]).toLocaleLowerCase("cs-CZ");if(["asphalt","paving","gravel","stairs","wood","concrete","grass","dirt"].includes(explicit))return explicit;const value=propertyValue(p,["surface","povrch","surfaceType"]).toLocaleLowerCase("cs-CZ");if(value.includes("dlaž")||value.includes("dlaz")||value.includes("kost"))return "paving";if(value.includes("štěrk")||value.includes("sterk")||value.includes("prach")||value.includes("šotol")||value.includes("sotol"))return "gravel";if(value.includes("schod"))return "stairs";if(value.includes("dřev")||value.includes("drev")||value.includes("láv")||value.includes("lav"))return "wood";if(value.includes("beton")||value.includes("panel"))return "concrete";if(value.includes("tráv")||value.includes("trav")||value.includes("grass")||value.includes("terén")||value.includes("teren"))return "grass";if(value.includes("hlín")||value.includes("hlin")||value.includes("zem"))return "dirt";return "asphalt"}
+function surfaceSvg(key){const common='viewBox="0 0 24 24" fill="white" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';const icons={asphalt:'<svg '+common+'><circle cx="12" cy="12" r="4.2"/></svg>',paving:'<svg '+common+'><rect x="3" y="6" width="8" height="5" rx=".7"/><rect x="13" y="6" width="8" height="5" rx=".7"/><rect x="8" y="13" width="8" height="5" rx=".7"/></svg>',gravel:'<svg '+common+'><circle cx="6" cy="12" r="2.2"/><circle cx="12" cy="8" r="2.2"/><circle cx="18" cy="13" r="2.2"/></svg>',dirt:'<svg '+common+'><path d="M4 16c3-7 6 4 9-3s5 2 7-3"/><circle cx="7" cy="7" r="1.3"/></svg>',wood:'<svg '+common+'><rect x="3" y="6" width="18" height="12" rx="1"/><path d="M8 6v12M13 6v12M18 6v12"/></svg>',concrete:'<svg '+common+'><rect x="3" y="6" width="18" height="12" rx="1"/><path d="M12 6v12M3 12h18"/></svg>',stairs:'<svg '+common+'><path d="M3 18h5v-4h5v-4h5V6h3" fill="none"/></svg>',grass:'<svg '+common+'><path d="M12 19V7M12 14 7 9M12 15l5-6M7 19h10" fill="none"/></svg>'};return icons[key]||icons.asphalt}
+function surfaceMarkerIcon(feature){const key=surfaceKeyForFeature(feature);return L.divIcon({className:"viewer-surface-marker",html:'<div class="viewer-surface-symbol">'+surfaceSvg(key)+'</div>',iconSize:[20,20],iconAnchor:[10,10]})}
+function decorateLine(layer,feature){if(!window.L.polylineDecorator||!layer?.getLatLngs)return;const decorator=L.polylineDecorator(layer,{patterns:[{offset:18,repeat:62,symbol:L.Symbol.marker({rotate:true,markerOptions:{icon:surfaceMarkerIcon(feature),interactive:false,keyboard:false}})}]});symbolGroup.addLayer(decorator)}
 function popupHtml(feature,index){const p=feature?.properties||{},entries=Object.entries(p).filter(([,v])=>v!==null&&v!==undefined&&String(v)!=="");return '<div class="popup-title">'+escapeHtml(featureTitle(feature,index))+'</div><div class="prop"><b>Geometrie:</b> '+escapeHtml(feature?.geometry?.type||"neznámá")+'</div>'+entries.slice(0,30).map(([k,v])=>'<div class="prop"><b>'+escapeHtml(k)+':</b> '+escapeHtml(typeof v==="object"?JSON.stringify(v):v)+'</div>').join("")}
 function focusFeature(index){const layer=layerByIndex.get(index);if(!layer)return;document.querySelectorAll(".item.active").forEach(i=>i.classList.remove("active"));const item=itemByIndex.get(index);item?.classList.add("active");item?.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"});if(typeof layer.getBounds==="function"){const bounds=layer.getBounds();if(bounds?.isValid())map.fitBounds(bounds.pad(.35),{maxZoom:19})}else if(typeof layer.getLatLng==="function")map.setView(layer.getLatLng(),18);layer.openPopup?.()}
-features.forEach((feature,index)=>{try{const geo=L.geoJSON(feature,{style:()=>({color:lineColor(feature),weight:7,opacity:.92,lineCap:"round",lineJoin:"round",fillColor:lineColor(feature),fillOpacity:.18}),pointToLayer:(_f,latlng)=>L.circleMarker(latlng,{radius:9,color:"#ef4444",weight:4,fillColor:"#ffffff",fillOpacity:1}),onEachFeature:(_f,layer)=>{layer.bindPopup(popupHtml(feature,index),{maxWidth:340});layer.on("click",()=>{document.querySelectorAll(".item.active").forEach(i=>i.classList.remove("active"));itemByIndex.get(index)?.classList.add("active")})}});geo.eachLayer(layer=>layerByIndex.set(index,layer));geo.addTo(allGroup)}catch(error){console.warn("Prvek nelze zobrazit",index,error)}});
+features.forEach((feature,index)=>{try{const isPoint=["Point","MultiPoint"].includes(feature?.geometry?.type);const geo=L.geoJSON(feature,{style:()=>({color:lineColor(feature),weight:7,opacity:.92,lineCap:"round",lineJoin:"round",fillColor:lineColor(feature),fillOpacity:.18}),pointToLayer:(_f,latlng)=>L.marker(latlng,{icon:warningMarkerIcon(feature)}),onEachFeature:(_f,layer)=>{layer.bindPopup(popupHtml(feature,index),{maxWidth:340});layer.on("click",()=>{document.querySelectorAll(".item.active").forEach(i=>i.classList.remove("active"));itemByIndex.get(index)?.classList.add("active")})}});geo.eachLayer(layer=>{if(!layerByIndex.has(index))layerByIndex.set(index,layer);if(!isPoint)decorateLine(layer,feature)});geo.addTo(allGroup)}catch(error){console.warn("Prvek nelze zobrazit",index,error)}});
 const lineTypes=new Set(["LineString","MultiLineString"]),pointTypes=new Set(["Point","MultiPoint"]);
 document.getElementById("fileTitle").textContent=fileName;document.getElementById("allCount").textContent=features.length;document.getElementById("lineCount").textContent=features.filter(f=>lineTypes.has(f?.geometry?.type)).length;document.getElementById("pointCount").textContent=features.filter(f=>pointTypes.has(f?.geometry?.type)).length;
 function renderList(query=""){const list=document.getElementById("list"),needle=query.trim().toLocaleLowerCase("cs-CZ");itemByIndex.clear();const matches=features.map((feature,index)=>({feature,index})).filter(({feature,index})=>!needle||(featureTitle(feature,index)+" "+JSON.stringify(feature?.properties||{})).toLocaleLowerCase("cs-CZ").includes(needle));if(!matches.length){list.innerHTML='<div class="empty">Žádný odpovídající prvek.</div>';return}list.innerHTML="";matches.forEach(({feature,index})=>{const item=document.createElement("button");item.type="button";item.className="item";item.innerHTML='<div class="item-title">'+escapeHtml(featureTitle(feature,index))+'</div><div class="item-meta">'+escapeHtml(feature?.geometry?.type||"bez geometrie")+' · prvek '+(index+1)+'</div>';item.onclick=()=>focusFeature(index);list.appendChild(item);itemByIndex.set(index,item)})}
@@ -1629,6 +1642,7 @@ const GPS_STORAGE_KEY = "esk8-gps-recorder-v2";
 const gpsRecorder = {
   map: null,
   trackLayer: null,
+  trackSymbolLayer: null,
   warningLayer: null,
   positionLayer: null,
   accuracyLayer: null,
@@ -1778,6 +1792,7 @@ function gpsInitMap() {
   }).addTo(gpsRecorder.map);
 
   gpsRecorder.trackLayer = L.layerGroup().addTo(gpsRecorder.map);
+  gpsRecorder.trackSymbolLayer = L.layerGroup().addTo(gpsRecorder.map);
   gpsRecorder.warningLayer = L.layerGroup().addTo(gpsRecorder.map);
   gpsRebuildMapLayers();
 }
@@ -1913,18 +1928,42 @@ function gpsLineStyle(segment) {
   return { color: quality?.color || "#3aa7ff", weight: 7, opacity: .92, lineCap: "round", lineJoin: "round" };
 }
 
+function gpsRefreshSegmentSymbols(segment) {
+  if (!gpsRecorder.trackSymbolLayer || !window.L.polylineDecorator) return;
+  if (segment.symbolLayer) gpsRecorder.trackSymbolLayer.removeLayer(segment.symbolLayer);
+  segment.symbolLayer = null;
+  if (!segment.layer || segment.points.length < 2) return;
+
+  const surface = gpsOption("surface", segment.surfaceId)?.label || "Asfalt";
+  segment.symbolLayer = L.polylineDecorator(segment.layer, {
+    patterns: [{
+      offset: 18,
+      repeat: 62,
+      symbol: L.Symbol.marker({
+        rotate: true,
+        markerOptions: { icon: surfaceSymbolIcon(surface), interactive: false, keyboard: false }
+      })
+    }]
+  });
+  gpsRecorder.trackSymbolLayer.addLayer(segment.symbolLayer);
+}
+
 function gpsRestyleSegment(segment) {
   if (segment.layer) segment.layer.setStyle(gpsLineStyle(segment));
+  gpsRefreshSegmentSymbols(segment);
 }
 
 function gpsRebuildMapLayers() {
-  if (!gpsRecorder.map || !gpsRecorder.trackLayer || !gpsRecorder.warningLayer) return;
+  if (!gpsRecorder.map || !gpsRecorder.trackLayer || !gpsRecorder.trackSymbolLayer || !gpsRecorder.warningLayer) return;
   gpsRecorder.trackLayer.clearLayers();
+  gpsRecorder.trackSymbolLayer.clearLayers();
   gpsRecorder.warningLayer.clearLayers();
 
   for (const segment of gpsRecorder.segments) {
     const latlngs = segment.points.map(point => [point.lat, point.lng]);
     segment.layer = L.polyline(latlngs, gpsLineStyle(segment)).addTo(gpsRecorder.trackLayer);
+    segment.symbolLayer = null;
+    gpsRefreshSegmentSymbols(segment);
   }
 
   for (const warning of gpsRecorder.warnings) {
@@ -1961,7 +2000,8 @@ function gpsStartSegment(copyLastPoint = false) {
     qualityId: gpsRecorder.qualityId,
     startedAt: new Date().toISOString(),
     points: [],
-    layer: null
+    layer: null,
+    symbolLayer: null
   };
   if (copyLastPoint && gpsRecorder.lastAccepted) segment.points.push({ ...gpsRecorder.lastAccepted });
   gpsRecorder.segments.push(segment);
@@ -2112,6 +2152,7 @@ function gpsOnPosition(position) {
 
   if (gpsRecorder.currentSegment.layer) {
     gpsRecorder.currentSegment.layer.addLatLng([point.lat, point.lng]);
+    gpsRefreshSegmentSymbols(gpsRecorder.currentSegment);
   }
 
   const surface = gpsOption("surface", gpsRecorder.surfaceId)?.label || "povrch";
@@ -2210,7 +2251,7 @@ function gpsRestoreDraft() {
     gpsRecorder.mode = saved.mode || "idle";
     gpsRecorder.surfaceId = saved.surfaceId || null;
     gpsRecorder.qualityId = saved.qualityId || null;
-    gpsRecorder.segments = Array.isArray(saved.segments) ? saved.segments.map(segment => ({ ...segment, layer: null })) : [];
+    gpsRecorder.segments = Array.isArray(saved.segments) ? saved.segments.map(segment => ({ ...segment, layer: null, symbolLayer: null })) : [];
     gpsRecorder.warnings = Array.isArray(saved.warnings) ? saved.warnings.map(warning => ({ ...warning, layer: null })) : [];
     gpsRecorder.lastLocation = saved.lastLocation || null;
     gpsRecorder.lastAccepted = saved.lastAccepted || null;
@@ -2235,6 +2276,7 @@ function gpsResetData(ask = true) {
   gpsRecorder.lastAccepted = null;
   gpsRecorder.distanceM = 0;
   gpsRecorder.trackLayer?.clearLayers();
+  gpsRecorder.trackSymbolLayer?.clearLayers();
   gpsRecorder.warningLayer?.clearLayers();
   localStorage.removeItem(GPS_STORAGE_KEY);
   gpsReleaseWakeLock();
@@ -2258,8 +2300,11 @@ function gpsExportGeoJson() {
         note: "Zaznamenáno GPS nástrojem ESK8",
         surface: surface?.label || null,
         surface_option_id: segment.surfaceId || null,
+        surface_symbol: surfaceKey(surface?.label || "Asfalt"),
         quality: quality?.label || null,
         quality_option_id: segment.qualityId || null,
+        stroke: quality?.color || "#3aa7ff",
+        "stroke-width": 7,
         source: "esk8-gps-recorder",
         recorded_at: segment.startedAt,
         point_count: segment.points.length,
@@ -2280,6 +2325,9 @@ function gpsExportGeoJson() {
         note: "Zaznamenáno GPS nástrojem ESK8",
         warning: option?.label || warning.warningLabel || "Výstraha",
         warning_option_id: warning.warningId || null,
+        warning_icon: option?.icon || "warning",
+        "marker-symbol": option?.icon || "warning",
+        "marker-color": "#ef4444",
         source: "esk8-gps-recorder",
         recorded_at: warning.timestamp,
         accuracy: warning.accuracy
