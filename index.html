@@ -542,13 +542,14 @@
       <div class="section">
         <h3>GeoJSON náhled / data mapy</h3>
         <div class="row wrap">
-          <button id="openGeoJsonViewerBtn" class="btn small">🗺 Otevřít GeoJSON v druhém okně</button>
-          <button id="exportGeoJsonBtn" class="btn small primary">⬇ Exportovat online mapu</button>
+          <button id="selectGeoJsonViewerBtn" class="btn small">📂 Vybrat GeoJSON</button>
+          <button id="openGeoJsonTabBtn" class="btn small primary" disabled>🗺 Otevřít v nové kartě</button>
+          <button id="exportGeoJsonBtn" class="btn small">⬇ Exportovat online mapu</button>
           <input id="geoJsonViewerFileInput" class="hidden" type="file" accept=".geojson,.json,application/geo+json,application/json">
         </div>
         <div class="muted" style="margin-top:8px">
-          Vybraný soubor se <b>neimportuje</b> a nic se neuloží do Supabase. Otevře se pouze jako podklad
-          v samostatném okně nebo kartě, zatímco v této online mapě můžeš prvky ručně překreslovat.
+          Nejprve vyber soubor. Po kontrole se zpřístupní tlačítko <b>Otevřít v nové kartě</b>.
+          Soubor se neimportuje a nic se neuloží do Supabase.
         </div>
         <div id="geoJsonStatus" class="muted" style="margin-top:8px"></div>
       </div>
@@ -1469,7 +1470,8 @@ function downloadGeoJson() {
   toast(`GeoJSON exportován (${collection.features.length} prvků).`, "success");
 }
 
-let geoJsonViewerWindow = null;
+let geoJsonViewerPrepared = null;
+let geoJsonViewerFileName = "";
 
 function normalizeGeoJsonForViewer(input) {
   if (input?.type === "FeatureCollection" && Array.isArray(input.features)) return input;
@@ -1506,7 +1508,7 @@ function openGeoJsonWaitingWindow() {
     h1{font-size:20px;margin:0 0 7px}.muted{color:#9db0c5;font-size:13px}@keyframes spin{to{transform:rotate(360deg)}}
   </style>
 </head>
-<body><div class="box"><div class="spinner"></div><h1>Čekám na GeoJSON</h1><div class="muted">Po výběru souboru se zde zobrazí náhled. Do online mapy se nic neukládá.</div></div></body>
+<body><div class="box"><div class="spinner"></div><h1>GeoJSON náhled</h1><div class="muted">Tato karta slouží pouze jako náhled. Do online mapy se nic neukládá.</div></div></body>
 </html>`);
   viewer.document.close();
   viewer.focus();
@@ -1554,7 +1556,7 @@ function renderGeoJsonViewer(viewer, collection, fileName) {
     <div class="tools"><input id="search" type="search" placeholder="Hledat v názvu a vlastnostech…"><button id="fitAll" type="button">Vše</button></div>
     <div id="list" class="list"></div>
   </aside>
-  <main style="position:relative;min-width:0;min-height:0"><div class="viewer-note">Podklad v tomto okně · online mapu překresluj v původním okně</div><div id="map"></div></main>
+  <main style="position:relative;min-width:0;min-height:0"><div class="viewer-note">Podklad v této kartě · online mapu překresluj v původní kartě</div><div id="map"></div></main>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
 <script>
@@ -1583,17 +1585,40 @@ renderList();document.getElementById("search").addEventListener("input",e=>rende
   viewer.focus();
 }
 
-async function openGeoJsonViewerFile(file, viewer) {
+async function prepareGeoJsonViewerFile(file) {
   if (!isAdmin()) throw new Error("GeoJSON náhled je dostupný pouze správci.");
   if (!file) throw new Error("Nebyl vybrán žádný soubor.");
   if (file.size > 20 * 1024 * 1024) throw new Error("Soubor je příliš velký. Maximum je 20 MB.");
-  el("geoJsonStatus").textContent = "Načítám GeoJSON do samostatného okna…";
+
+  el("geoJsonStatus").textContent = "Načítám a kontroluji GeoJSON…";
   const input = JSON.parse(await file.text());
   const collection = normalizeGeoJsonForViewer(input);
-  if (collection.features.length > 10000) throw new Error("Náhled podporuje nejvýše 10 000 prvků v jednom souboru.");
-  renderGeoJsonViewer(viewer, collection, file.name);
-  el("geoJsonStatus").textContent = `Náhled otevřen: ${file.name} · ${collection.features.length} prvků · nic nebylo importováno.`;
-  toast("GeoJSON byl otevřen pouze jako náhled.", "success");
+  if (collection.features.length > 10000) {
+    throw new Error("Náhled podporuje nejvýše 10 000 prvků v jednom souboru.");
+  }
+
+  geoJsonViewerPrepared = collection;
+  geoJsonViewerFileName = file.name || "GeoJSON soubor";
+  el("openGeoJsonTabBtn").disabled = false;
+  el("geoJsonStatus").textContent =
+    `Připraveno: ${geoJsonViewerFileName} · ${collection.features.length} prvků. Teď klepni na Otevřít v nové kartě.`;
+}
+
+function openPreparedGeoJsonInTab() {
+  if (!geoJsonViewerPrepared) {
+    return toast("Nejdřív vyber GeoJSON soubor.", "error");
+  }
+
+  // Bez rozměrů a bez parametru popup: Chrome to otevře jako běžnou novou kartu.
+  const viewerTab = window.open("about:blank", "_blank");
+  if (!viewerTab) {
+    throw new Error("Chrome zablokoval novou kartu. Povol tomuto webu otevírání nových karet.");
+  }
+
+  renderGeoJsonViewer(viewerTab, geoJsonViewerPrepared, geoJsonViewerFileName);
+  el("geoJsonStatus").textContent =
+    `Náhled otevřen v nové kartě: ${geoJsonViewerFileName} · nic nebylo importováno.`;
+  toast("GeoJSON byl otevřen v nové kartě pouze jako náhled.", "success");
 }
 
 
@@ -2332,39 +2357,42 @@ el("closeEditorBtn").onclick = closePanels;
 el("closeListBtn").onclick = closePanels;
 el("closeAdminBtn").onclick = closePanels;
 el("exportGeoJsonBtn").onclick = downloadGeoJson;
-el("openGeoJsonViewerBtn").onclick = () => {
-  try {
-    if (!isAdmin()) return toast("GeoJSON náhled je dostupný pouze správci.", "error");
-    geoJsonViewerWindow = openGeoJsonWaitingWindow();
-    el("geoJsonViewerFileInput").value = "";
-    el("geoJsonViewerFileInput").click();
-  } catch (error) {
-    console.error(error);
-    el("geoJsonStatus").textContent = error.message || "Druhé okno se nepodařilo otevřít.";
-    toast(error.message || "Druhé okno se nepodařilo otevřít.", "error");
-  }
+el("selectGeoJsonViewerBtn").onclick = () => {
+  if (!isAdmin()) return toast("GeoJSON náhled je dostupný pouze správci.", "error");
+  el("geoJsonViewerFileInput").value = "";
+  el("geoJsonViewerFileInput").click();
 };
+
 el("geoJsonViewerFileInput").addEventListener("change", async event => {
   try {
     const file = event.target.files?.[0];
-    if (!file) {
-      if (geoJsonViewerWindow && !geoJsonViewerWindow.closed) geoJsonViewerWindow.close();
-      return;
-    }
-    if (!geoJsonViewerWindow || geoJsonViewerWindow.closed) geoJsonViewerWindow = openGeoJsonWaitingWindow();
-    await openGeoJsonViewerFile(file, geoJsonViewerWindow);
+    if (!file) return;
+
+    geoJsonViewerPrepared = null;
+    geoJsonViewerFileName = "";
+    el("openGeoJsonTabBtn").disabled = true;
+    await prepareGeoJsonViewerFile(file);
   } catch (error) {
     console.error(error);
-    if (geoJsonViewerWindow && !geoJsonViewerWindow.closed) {
-      geoJsonViewerWindow.document.body.innerHTML = `<div style="font-family:system-ui;padding:24px;background:#07111f;color:#eef6ff;min-height:100vh"><h2>GeoJSON se nepodařilo otevřít</h2><p style="color:#ff9aaa">${escapeHtml(error.message || "Neznámá chyba")}</p><p style="color:#9db0c5">Do online mapy nebyla zapsána žádná data.</p></div>`;
-    }
+    geoJsonViewerPrepared = null;
+    geoJsonViewerFileName = "";
+    el("openGeoJsonTabBtn").disabled = true;
     el("geoJsonStatus").textContent = error.message || "Náhled GeoJSON selhal.";
     toast(error.message || "Náhled GeoJSON selhal.", "error");
   }
 });
+
+el("openGeoJsonTabBtn").onclick = () => {
+  try {
+    openPreparedGeoJsonInTab();
+  } catch (error) {
+    console.error(error);
+    el("geoJsonStatus").textContent = error.message || "Novou kartu se nepodařilo otevřít.";
+    toast(error.message || "Novou kartu se nepodařilo otevřít.", "error");
+  }
+};
+
 el("geoJsonViewerFileInput").addEventListener("cancel", () => {
-  if (geoJsonViewerWindow && !geoJsonViewerWindow.closed) geoJsonViewerWindow.close();
-  geoJsonViewerWindow = null;
   el("geoJsonStatus").textContent = "Výběr souboru zrušen.";
 });
 el("drawLineBtn").onclick = () => startDrawing("line");
